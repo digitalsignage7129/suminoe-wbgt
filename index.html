@@ -2,94 +2,80 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>住之江区 WBGTモニタ</title>
+    <title>住之江区 WBGT</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; background: #1a1a1a; color: white; text-align: center; padding: 20px; }
-        .card { background: #2d2d2d; border-radius: 20px; padding: 30px; margin: 20px auto; max-width: 450px; border: 1px solid #444; }
-        #wbgt-val { font-size: 5.5rem; font-weight: bold; margin: 10px 0; }
-        .status-badge { display: inline-block; padding: 10px 25px; border-radius: 50px; font-size: 1.6rem; font-weight: bold; margin-top: 15px; background: #555; }
-        #debug-msg { font-size: 0.9rem; color: #ff9900; margin-top: 30px; min-height: 1.2em; }
-        .chart-container { max-width: 500px; margin: 30px auto; }
+        body { background: #1a1a1a; color: white; text-align: center; font-family: sans-serif; }
+        .card { background: #333; border-radius: 15px; padding: 20px; margin: 20px auto; max-width: 400px; }
+        #wbgt-val { font-size: 4rem; font-weight: bold; }
+        #status-msg { font-size: 1.5rem; margin-bottom: 10px; }
+        #debug { font-size: 0.8rem; color: #888; margin-top: 20px; border-top: 1px solid #444; padding-top: 10px; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <div style="color:#aaa">大阪市住之江区付近</div>
+        <p>大阪市住之江区 WBGT推計</p>
+        <div id="status-msg">読み込み中...</div>
         <div id="wbgt-val">--</div>
-        <div id="wbgt-status" class="status-badge">読込中</div>
     </div>
 
-    <div class="chart-container">
-        <canvas id="weatherChart"></canvas>
+    <div style="max-width: 400px; margin: auto;">
+        <canvas id="myChart"></canvas>
     </div>
 
-    <div id="debug-msg">プログラムを起動中...</div>
+    <div id="debug">Initializing...</div>
 
     <script>
-        const DATA_URL = "./weather_data.json";
-
-        async function updateWeather() {
-            const wbgtVal = document.getElementById('wbgt-val');
-            const badge = document.getElementById('wbgt-status');
-            const debug = document.getElementById('debug-msg');
+        async function loadData() {
+            const valElem = document.getElementById('wbgt-val');
+            const msgElem = document.getElementById('status-msg');
+            const debugElem = document.getElementById('debug');
 
             try {
-                debug.innerText = "データファイルを確認中...";
-                const response = await fetch(DATA_URL + '?t=' + Date.now());
+                debugElem.innerText = "Fetch開始...";
+                // キャッシュ回避のため?t=を付ける
+                const res = await fetch('./weather_data.json?t=' + Date.now());
                 
-                if (!response.ok) {
-                    throw new Error("データ(JSON)が見つかりません。反映待ちの可能性があります。");
-                }
-                
-                const data = await response.json();
-                if (data.status === "err") throw new Error(data.msg);
-
-                const temps = data.temps;
-                const currentTemp = parseFloat(temps[0]);
-                const wbgt = (currentTemp * 0.73 + 2.4).toFixed(1);
-
-                wbgtVal.innerText = wbgt + "℃";
-                
-                if (wbgt >= 31) { 
-                    badge.innerText = "危険"; badge.style.backgroundColor = "red"; wbgtVal.style.color = "red"; 
-                } else if (wbgt >= 28) { 
-                    badge.innerText = "厳重警戒"; badge.style.backgroundColor = "orange"; wbgtVal.style.color = "orange"; 
-                } else { 
-                    badge.innerText = "注意"; badge.style.backgroundColor = "#00b0f0"; wbgtVal.style.color = "#00b0f0"; 
+                if (!res.ok) {
+                    throw new Error("ファイルが見つかりません。Actionsが成功しているか確認してください。");
                 }
 
-                drawChart(temps);
-                debug.innerText = "最終更新成功: " + new Date().toLocaleTimeString();
+                const data = await res.json();
+                debugElem.innerText = "データ解析中...";
+
+                if (data.status === "ok") {
+                    const temp = parseFloat(data.temps[0]);
+                    const wbgt = (temp * 0.73 + 2.4).toFixed(1);
+                    
+                    valElem.innerText = wbgt + "℃";
+                    msgElem.innerText = wbgt >= 31 ? "【危険】" : wbgt >= 28 ? "【厳重警戒】" : "【注意】";
+                    valElem.style.color = wbgt >= 28 ? "orange" : "cyan";
+                    
+                    debugElem.innerText = "更新成功: " + new Date().toLocaleTimeString();
+                    showChart(data.temps);
+                } else {
+                    throw new Error("データエラー: " + data.msg);
+                }
 
             } catch (e) {
-                wbgtVal.innerText = "WAIT";
-                debug.innerText = "状況: " + e.message;
+                debugElem.innerText = "状況: " + e.message;
+                valElem.innerText = "WAIT";
             }
         }
 
-        function drawChart(temps) {
-            const ctx = document.getElementById('weatherChart').getContext('2d');
-            if (window.myChart) window.myChart.destroy();
-            Chart.defaults.color = '#888';
-            window.myChart = new Chart(ctx, {
+        function showChart(temps) {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: temps.map((_, i) => ["今日", "夜", "明日", "後"][i] || ""),
-                    datasets: [{
-                        data: temps,
-                        borderColor: '#ff6384',
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: { plugins: { legend: { display: false } } }
+                    labels: temps.map((_, i) => i),
+                    datasets: [{ label: '気温', data: temps, borderColor: 'red' }]
+                }
             });
         }
 
-        updateWeather();
+        loadData();
     </script>
 </body>
 </html>
