@@ -1,47 +1,43 @@
 import requests
 import json
 import os
-import traceback
 
 def fetch_weather():
-    # 気象庁（大阪府）
     url = "https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json"
     
     try:
-        # ユーザーエージェント（ブラウザのふりをする設定）を追加
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+        # 気象庁へのアクセス
+        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        res.raise_for_status()
+        data = res.json()
         
-        # データの抽出をより確実にする
-        try:
-            area_data = data[0]['timeSeries'][2]['areas']
-            osaka = next(a for a in area_data if a['area']['name'] == "大阪市")
-            temps = [t for t in osaka['temps'] if t]
-        except:
-            # 抽出に失敗した場合は別の場所を探す
-            temp_series = next(s for s in data[0]['timeSeries'] if 'temps' in s['areas'][0])
-            osaka = next(a for a in temp_series['areas'] if a['area']['name'] == "大阪市")
-            temps = [t for t in osaka['temps'] if t]
+        # 気温データを総当たりで探す（エラー防止）
+        temps = []
+        for series in data[0]['timeSeries']:
+            if 'temps' in series['areas'][0]:
+                for area in series['areas']:
+                    if "大阪" in area['area']['name']:
+                        temps = [t for t in area['temps'] if t]
+                        break
+            if temps: break
 
         if not temps:
             raise ValueError("気温データが見つかりませんでした")
 
+        # 保存するデータの作成
         result = {
             "status": "ok",
             "temps": temps,
-            "updated": os.getenv('GITHUB_RUN_ID', 'manual-run')
+            "updated": os.getenv('GITHUB_RUN_ID', 'manual')
         }
 
     except Exception as e:
-        # ★エラーの詳細を msg に書き出す
-        error_detail = traceback.format_exc()
         result = {
             "status": "err",
-            "msg": f"{str(e)} | Detail: {error_detail[:100]}"
+            "msg": str(e)
         }
 
+    # 上書き保存
     with open("weather_data.json", "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
