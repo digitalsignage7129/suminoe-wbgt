@@ -26,8 +26,9 @@
         <canvas id="weatherChart"></canvas>
     </div>
 
-   <script>
-    const JMA_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json";
+  <script>
+    // プロキシサーバーを経由させることでブロックを回避します
+    const JMA_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json");
 
     async function updateWeather() {
         const wbgtVal = document.getElementById('wbgt-val');
@@ -35,36 +36,34 @@
 
         try {
             const response = await fetch(JMA_URL);
-            if (!response.ok) throw new Error('データが取得できませんでした');
+            if (!response.ok) throw new Error('データ取得失敗');
             const data = await response.json();
             
-            // 大阪地方の時系列データを取得
+            // 大阪市の気温データを取得
             const timeSeries = data[0].timeSeries[2];
-            // 大阪市のインデックスを探す（通常は0番目）
             const cityIndex = timeSeries.areas.findIndex(a => a.area.name === "大阪市");
             const temps = timeSeries.areas[cityIndex].temps;
             
-            // 現在の気温を取得（一番近い予報値）
             const currentTemp = parseFloat(temps[0]);
 
             if (isNaN(currentTemp)) {
                 wbgtVal.innerText = "確認中";
             } else {
-                // 簡易WBGT計算（気温から算出）
+                // 気温からWBGTを推定
                 const estimatedWBGT = (currentTemp * 0.7 + 5).toFixed(1);
                 wbgtVal.innerText = `${estimatedWBGT}℃`;
                 updateBadge(estimatedWBGT);
                 drawChart(temps);
             }
-
         } catch (e) {
             console.error(e);
             wbgtVal.innerText = "ERR";
-            badge.innerText = "通信エラー";
+            badge.innerText = "取得失敗";
             badge.style.backgroundColor = "gray";
         }
     }
 
+    // --- (updateBadge と drawChart 関数は前回と同じでOKです) ---
     function updateBadge(val) {
         const badge = document.getElementById('wbgt-status');
         if (val >= 31) { badge.innerText = "危険"; badge.style.backgroundColor = "red"; }
@@ -75,7 +74,6 @@
 
     function drawChart(temps) {
         const ctx = document.getElementById('weatherChart').getContext('2d');
-        // すでにグラフがある場合は破棄して再描画（二重表示防止）
         if (window.myChart) { window.myChart.destroy(); }
         window.myChart = new Chart(ctx, {
             type: 'line',
@@ -89,8 +87,7 @@
                     fill: true,
                     tension: 0.4
                 }]
-            },
-            options: { responsive: true, scales: { y: { beginAtZero: false } } }
+            }
         });
     }
 
