@@ -1,4 +1,8 @@
 {
-  "status": "err",
-  "msg": " | Detail: Traceback (most recent call last):\n  File \"/home/runner/work/suminoe-wbgt/suminoe-wbgt/get_weather.p"
+  "status": "ok",
+  "temps": [
+    "16",
+    "20"
+  ],
+  "updated": "25153866897"
 }
