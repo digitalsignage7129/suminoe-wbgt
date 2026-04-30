@@ -5,64 +5,102 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>住之江区 WBGTモニタ</title>
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
-        .container { max-width: 500px; margin: auto; }
-        .card { background: #2d2d2d; border-radius: 20px; padding: 30px 20px; margin-bottom: 20px; border: 1px solid #444; }
-        .wbgt-title { color: #aaa; font-size: 1.1rem; }
-        #wbgt-val { font-size: 8rem; font-weight: bold; line-height: 1; margin: 20px 0; }
-        #wbgt-status { display: inline-block; padding: 12px 40px; border-radius: 50px; font-size: 2rem; font-weight: bold; color: white; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .info-item { background: #2d2d2d; padding: 20px; border-radius: 15px; border: 1px solid #444; }
-        .info-label { color: #888; font-size: 0.9rem; margin-bottom: 8px; }
-        .info-value { font-size: 1.4rem; font-weight: bold; }
-        #update-time { font-size: 0.8rem; color: #666; margin-top: 30px; }
+        /* サイネージ向け：白背景に黒文字の高コントラスト設計 */
+        body { background: #ffffff; color: #000000; font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Meiryo", sans-serif; text-align: center; margin: 0; padding: 10px; overflow: hidden; }
+        .container { max-width: 800px; margin: auto; }
+        
+        /* WBGTメイン表示エリア */
+        .card { background: #f8f9fa; border: 4px solid #000; border-radius: 30px; padding: 40px 20px; margin-bottom: 20px; }
+        .wbgt-title { color: #333; font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; }
+        
+        /* 巨大な数値 */
+        #wbgt-val { font-size: 15rem; font-weight: 900; line-height: 0.9; margin: 20px 0; letter-spacing: -5px; }
+        #wbgt-unit { font-size: 4rem; margin-left: -10px; }
+        
+        /* 状態ラベル（背景色で直感的に判別） */
+        #wbgt-status { display: block; width: 80%; margin: 0 auto; padding: 20px 0; border-radius: 100px; font-size: 3.5rem; font-weight: 900; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); border: 4px solid rgba(0,0,0,0.1); }
+
+        /* サブ情報のグリッド */
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .info-item { background: #fff; padding: 20px; border-radius: 20px; border: 3px solid #000; }
+        .info-label { color: #000; font-size: 1.2rem; font-weight: bold; border-bottom: 2px solid #000; margin-bottom: 10px; padding-bottom: 5px; }
+        .info-value { font-size: 2rem; font-weight: 900; }
+        
+        #update-time { font-size: 1rem; color: #333; margin-top: 30px; font-weight: bold; }
     </style>
 </head>
 <body>
+
 <div class="container">
     <div class="card">
-        <div class="wbgt-title">環境省 公式実測値 (大阪)</div>
+        <div class="wbgt-title">環境省公表 WBGT指数（大阪）</div>
         <div id="wbgt-val">--</div>
         <div id="wbgt-status">読込中</div>
     </div>
+
     <div class="info-grid">
-        <div class="info-item"><div class="info-label">現在の天気</div><div id="weather-text" class="info-value">--</div></div>
-        <div class="info-item"><div class="info-label">気温</div><div id="temp-text" class="info-value">--℃</div></div>
-        <div class="info-item" style="grid-column: span 2;"><div class="info-label">風の状態</div><div id="wind-text" class="info-value" style="font-size:1rem;">--</div></div>
+        <div class="info-item">
+            <div class="info-label">天気</div>
+            <div id="weather-text" class="info-value">--</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">気温</div>
+            <div id="temp-text" class="info-value">--℃</div>
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+            <div class="info-label">風の状態</div>
+            <div id="wind-text" class="info-value" style="font-size: 1.5rem;">--</div>
+        </div>
     </div>
-    <div id="update-time">データ取得中...</div>
+
+    <div id="update-time">Loading...</div>
 </div>
+
 <script>
     async function updateDisplay() {
         try {
             const response = await fetch('./weather_data.json?t=' + Date.now());
             const data = await response.json();
+
             if (data.status === "ok") {
-                let wbgt = parseFloat(data.wbgt);
-                if (isNaN(wbgt)) wbgt = 0.0;
+                const wbgtNum = parseFloat(data.wbgt);
                 
-                document.getElementById('wbgt-val').innerText = wbgt.toFixed(1);
+                if (!isNaN(wbgtNum)) {
+                    document.getElementById('wbgt-val').innerHTML = wbgtNum.toFixed(1) + '<span id="wbgt-unit">℃</span>';
+                    
+                    const statusBox = document.getElementById('wbgt-status');
+                    const valText = document.getElementById('wbgt-val');
+                    
+                    // 色分け設定（環境省の指針に準拠）
+                    if (wbgtNum >= 31) {
+                        statusBox.innerText = "危 険"; 
+                        statusBox.style.backgroundColor = "#ff0000"; // 赤
+                    } else if (wbgtNum >= 28) {
+                        statusBox.innerText = "厳重警戒"; 
+                        statusBox.style.backgroundColor = "#ff9900"; // オレンジ
+                    } else if (wbgtNum >= 25) {
+                        statusBox.innerText = "警 戒"; 
+                        statusBox.style.backgroundColor = "#ffcc00"; // 黄色
+                        statusBox.style.color = "#000"; // 黄色は黒文字
+                    } else {
+                        statusBox.innerText = "ほぼ安全"; 
+                        statusBox.style.backgroundColor = "#00b0f0"; // 青
+                    }
+                }
+
                 document.getElementById('temp-text').innerText = data.temp + "℃";
                 document.getElementById('weather-text').innerText = data.weather;
                 document.getElementById('wind-text').innerText = data.wind;
-
-                const statusBox = document.getElementById('wbgt-status');
-                const valText = document.getElementById('wbgt-val');
-                if (wbgt >= 31) {
-                    statusBox.innerText = "危険"; statusBox.style.backgroundColor = "#ff0000"; valText.style.color = "#ff0000";
-                } else if (wbgt >= 28) {
-                    statusBox.innerText = "厳重警戒"; statusBox.style.backgroundColor = "#ff9900"; valText.style.color = "#ff9900";
-                } else if (wbgt >= 25) {
-                    statusBox.innerText = "警戒"; statusBox.style.backgroundColor = "#ffcc00"; statusBox.style.color = "#000"; valText.style.color = "#ffcc00";
-                } else {
-                    statusBox.innerText = "ほぼ安全"; statusBox.style.backgroundColor = "#00b0f0"; valText.style.color = "#00b0f0";
-                }
                 document.getElementById('update-time').innerText = "最終更新: " + new Date().toLocaleString();
             }
-        } catch (e) { document.getElementById('update-time').innerText = "エラー: " + e.message; }
+        } catch (error) {
+            document.getElementById('update-time').innerText = "取得エラー: " + error.message;
+        }
     }
+
     updateDisplay();
     setInterval(updateDisplay, 600000);
 </script>
+
 </body>
 </html>
