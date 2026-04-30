@@ -2,105 +2,103 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>住之江区 WBGT & 天気</title>
+    <title>住之江区 WBGTモニタ</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
-        .card { background: white; border-radius: 15px; padding: 20px; margin: 10px auto; max-width: 500px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        #wbgt-val { font-size: 3rem; font-weight: bold; }
-        .status-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; color: white; font-weight: bold; margin-top: 10px; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #222; color: white; text-align: center; padding: 20px; }
+        .card { background: #333; border-radius: 20px; padding: 30px; margin: 20px auto; max-width: 450px; border: 2px solid #444; }
+        #wbgt-val { font-size: 5rem; font-weight: bold; color: #00ff00; text-shadow: 0 0 20px rgba(0,255,0,0.5); }
+        .status-badge { display: inline-block; padding: 10px 20px; border-radius: 30px; font-size: 1.5rem; font-weight: bold; margin-top: 15px; background: #555; }
+        #debug-msg { font-size: 0.8rem; color: #888; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-    <h1>住之江区 暑さ指数（WBGT）</h1>
-
     <div class="card">
-        <h2>現在の推定WBGT</h2>
+        <div>住之江区 暑さ指数推計</div>
         <div id="wbgt-val">--</div>
-        <div id="wbgt-status" class="status-badge">取得中...</div>
+        <div id="wbgt-status" class="status-badge">読込中...</div>
+        <div id="debug-msg"></div>
     </div>
 
-    <div class="card">
+    <div style="max-width: 500px; margin: auto;">
         <canvas id="weatherChart"></canvas>
     </div>
 
- <script>
-    // 通信を安定させるためのプロキシ経由
-    const JMA_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json");
+    <script>
+        // より安定したプロキシを使用
+        const TARGET_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json";
+        const PROXY_URL = "https://api.allorigins.win/get?url=" + encodeURIComponent(TARGET_URL);
 
-    async function updateWeather() {
-        const wbgtVal = document.getElementById('wbgt-val');
-        const badge = document.getElementById('wbgt-status');
+        async function updateWeather() {
+            const wbgtVal = document.getElementById('wbgt-val');
+            const badge = document.getElementById('wbgt-status');
+            const debug = document.getElementById('debug-msg');
 
-        try {
-            const response = await fetch(JMA_URL);
-            const data = await response.json();
-            
-            // 1. 気温データが入っている場所（timeSeries）を特定する
-            // 多くの場合は data[0].timeSeries[2] ですが、念のため中身を確認しながら探します
-            const tempSeries = data[0].timeSeries.find(s => s.areas[0].temps);
-            
-            if (!tempSeries) throw new Error('気温データが見つかりません');
+            try {
+                debug.innerText = "データ取得中...";
+                const response = await fetch(PROXY_URL);
+                if (!response.ok) throw new Error('通信失敗');
+                
+                const json = await response.json();
+                // alloriginsは中身が文字列で返ることがあるのでパース
+                const data = typeof json.contents === 'string' ? JSON.parse(json.contents) : json.contents;
+                
+                // 大阪市の気温データ（timeSeries[2] または [1] を探す）
+                const tempSeries = data[0].timeSeries.find(s => s.areas[0].temps);
+                const osaka = tempSeries.areas.find(a => a.area.name === "大阪市");
+                const temps = osaka.temps.filter(t => t !== ""); // 空文字を除去
 
-            // 2. その中から「大阪市」のデータだけを抽出する
-            const osakaData = tempSeries.areas.find(a => a.area.name === "大阪市");
-            
-            if (!osakaData) throw new Error('大阪市のエリアが見つかりません');
+                if (temps.length === 0) throw new Error('気温データが空です');
 
-            const temps = osakaData.temps;
-            // 空文字や undefined を除外して、有効な数値だけを取得
-            const validTemps = temps.filter(t => t !== "" && t !== undefined);
-            const currentTemp = parseFloat(validTemps[0]);
+                const currentTemp = parseFloat(temps[0]);
+                // 推定WBGT計算
+                const wbgt = (currentTemp * 0.73 + 2.4).toFixed(1);
 
-            if (isNaN(currentTemp)) {
-                wbgtVal.innerText = "取得中";
-            } else {
-                // 気温からWBGTを推定 (係数 0.73 + 2.4 は環境省の簡易換算に近い数値です)
-                const estimatedWBGT = (currentTemp * 0.73 + 2.4).toFixed(1);
-                wbgtVal.innerText = `${estimatedWBGT}℃`;
-                updateBadge(estimatedWBGT);
-                drawChart(validTemps);
+                wbgtVal.innerText = wbgt + "℃";
+                updateStatus(wbgt);
+                drawChart(temps);
+                debug.innerText = "最終更新: " + new Date().toLocaleTimeString();
+
+            } catch (e) {
+                console.error(e);
+                wbgtVal.innerText = "Retry";
+                badge.innerText = "接続待機中";
+                debug.innerText = "エラー: " + e.message;
+                // 30秒後に自動再試行
+                setTimeout(updateWeather, 30000);
             }
-
-        } catch (e) {
-            console.error("エラー詳細:", e);
-            wbgtVal.innerText = "ERR";
-            badge.innerText = "再試行中...";
         }
-    }
 
-    function updateBadge(val) {
-        const badge = document.getElementById('wbgt-status');
-        if (val >= 31) { badge.innerText = "危険 (外出は控えて)"; badge.style.backgroundColor = "#ff0000"; }
-        else if (val >= 28) { badge.innerText = "厳重警戒"; badge.style.backgroundColor = "#ff9900"; }
-        else if (val >= 25) { badge.innerText = "警戒"; badge.style.backgroundColor = "#ffd700"; badge.style.color = "black"; }
-        else { badge.innerText = "ほぼ安全"; badge.style.backgroundColor = "#00b0f0"; }
-    }
+        function updateStatus(val) {
+            const badge = document.getElementById('wbgt-status');
+            const display = document.getElementById('wbgt-val');
+            if (val >= 31) { badge.innerText = "危険"; badge.style.backgroundColor = "#ff0000"; display.style.color = "#ff0000"; }
+            else if (val >= 28) { badge.innerText = "厳重警戒"; badge.style.backgroundColor = "#ff9900"; display.style.color = "#ff9900"; }
+            else if (val >= 25) { badge.innerText = "警戒"; badge.style.backgroundColor = "#ffd700"; badge.style.color = "black"; display.style.color = "#ffd700"; }
+            else { badge.innerText = "ほぼ安全"; badge.style.backgroundColor = "#00b0f0"; display.style.color = "#00b0f0"; }
+        }
 
-    function drawChart(temps) {
-        const ctx = document.getElementById('weatherChart').getContext('2d');
-        if (window.myChart) { window.myChart.destroy(); }
-        window.myChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: temps.map((_, i) => i === 0 ? "今" : i === 1 ? "次" : "先"),
-                datasets: [{ 
-                    label: '予想気温 (℃)', 
-                    data: temps, 
-                    borderColor: '#ff6384', 
-                    borderWidth: 3,
-                    fill: false,
-                    tension: 0.3
-                }]
-            },
-            options: {
-                scales: { y: { suggestedMin: 15, suggestedMax: 35 } }
-            }
-        });
-    }
+        function drawChart(temps) {
+            const ctx = document.getElementById('weatherChart').getContext('2d');
+            if (window.myChart) window.myChart.destroy();
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: temps.map((_, i) => ["今日", "今夜", "明日", "明後日"][i] || ""),
+                    datasets: [{
+                        label: '予想気温',
+                        data: temps,
+                        borderColor: '#ff6384',
+                        tension: 0.4,
+                        fill: false
+                    }]
+                },
+                options: { plugins: { legend: { display: false } } }
+            });
+        }
 
-    // 起動時に実行
-    updateWeather();
-</script>
+        updateWeather();
+    </script>
+</body>
+</html>
