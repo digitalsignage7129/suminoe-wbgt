@@ -5,19 +5,18 @@
     <title>住之江区 WBGTモニタ</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a1a; color: white; text-align: center; padding: 20px; margin: 0; }
-        .card { background: #2d2d2d; border-radius: 20px; padding: 30px; margin: 20px auto; max-width: 450px; border: 1px solid #444; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
-        .location { font-size: 1.2rem; color: #aaa; margin-bottom: 10px; }
-        #wbgt-val { font-size: 5.5rem; font-weight: bold; margin: 10px 0; line-height: 1; }
-        .status-badge { display: inline-block; padding: 10px 25px; border-radius: 50px; font-size: 1.6rem; font-weight: bold; margin-top: 15px; background: #555; transition: 0.3s; }
-        #debug-msg { font-size: 0.8rem; color: #666; margin-top: 30px; }
-        .chart-container { max-width: 500px; margin: 30px auto; background: #252525; padding: 15px; border-radius: 15px; }
+        body { font-family: sans-serif; background: #1a1a1a; color: white; text-align: center; padding: 20px; }
+        .card { background: #2d2d2d; border-radius: 20px; padding: 30px; margin: 20px auto; max-width: 450px; border: 1px solid #444; }
+        #wbgt-val { font-size: 5.5rem; font-weight: bold; margin: 10px 0; }
+        .status-badge { display: inline-block; padding: 10px 25px; border-radius: 50px; font-size: 1.6rem; font-weight: bold; margin-top: 15px; background: #555; }
+        #debug-msg { font-size: 0.9rem; color: #ff9900; margin-top: 30px; min-height: 1.2em; }
+        .chart-container { max-width: 500px; margin: 30px auto; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <div class="location">大阪市住之江区付近</div>
+        <div style="color:#aaa">大阪市住之江区付近</div>
         <div id="wbgt-val">--</div>
         <div id="wbgt-status" class="status-badge">読込中</div>
     </div>
@@ -26,15 +25,76 @@
         <canvas id="weatherChart"></canvas>
     </div>
 
-    <div id="debug-msg">Initializing...</div>
+    <div id="debug-msg">プログラムを起動中...</div>
 
     <script>
-        // 自分のリポジトリのJSONを読み込む
         const DATA_URL = "./weather_data.json";
 
         async function updateWeather() {
             const wbgtVal = document.getElementById('wbgt-val');
             const badge = document.getElementById('wbgt-status');
+            const debug = document.getElementById('debug-msg');
+
+            try {
+                debug.innerText = "データファイルを確認中...";
+                
+                // ?t=Date.now() でキャッシュを回避
+                const response = await fetch(DATA_URL + '?t=' + Date.now());
+                
+                if (!response.ok) {
+                    throw new Error("ファイルが見つかりません (404)。GitHub Pagesの反映待ちかもしれません。");
+                }
+                
+                const data = await response.json();
+                debug.innerText = "データを解析中...";
+
+                if (data.status === "err") throw new Error(data.msg);
+
+                const temps = data.temps;
+                const currentTemp = parseFloat(temps[0]);
+                const wbgt = (currentTemp * 0.73 + 2.4).toFixed(1);
+
+                wbgtVal.innerText = wbgt + "℃";
+                
+                // 状態の更新
+                if (wbgt >= 31) { badge.innerText = "危険"; badge.style.backgroundColor = "red"; wbgtVal.style.color = "red"; }
+                else if (wbgt >= 28) { badge.innerText = "厳重警戒"; badge.style.backgroundColor = "orange"; wbgtVal.style.color = "orange"; }
+                else { badge.innerText = "注意"; badge.style.backgroundColor = "#00b0f0"; wbgtVal.style.color = "#00b0f0"; }
+
+                drawChart(temps);
+                debug.innerText = "最終更新: " + new Date().toLocaleTimeString();
+
+            } catch (e) {
+                console.error(e);
+                wbgtVal.innerText = "WAIT";
+                debug.innerText = "状況: " + e.message;
+            }
+        }
+
+        function drawChart(temps) {
+            const ctx = document.getElementById('weatherChart').getContext('2d');
+            if (window.myChart) window.myChart.destroy();
+            Chart.defaults.color = '#888';
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: temps.map((_, i) => ["今", "夜", "明", "後"][i] || ""),
+                    datasets: [{
+                        data: temps,
+                        borderColor: '#ff6384',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: { plugins: { legend: { display: false } } }
+            });
+        }
+
+        updateWeather();
+    </script>
+</body>
+</html>            const badge = document.getElementById('wbgt-status');
             const debug = document.getElementById('debug-msg');
 
             try {
