@@ -2,80 +2,98 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>住之江区 WBGT</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>住之江区 WBGTモニタ</title>
     <style>
-        body { background: #1a1a1a; color: white; text-align: center; font-family: sans-serif; }
-        .card { background: #333; border-radius: 15px; padding: 20px; margin: 20px auto; max-width: 400px; }
-        #wbgt-val { font-size: 4rem; font-weight: bold; }
-        #status-msg { font-size: 1.5rem; margin-bottom: 10px; }
-        #debug { font-size: 0.8rem; color: #888; margin-top: 20px; border-top: 1px solid #444; padding-top: 10px; }
+        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: auto; }
+        .card { background: #2d2d2d; border-radius: 20px; padding: 20px; margin-bottom: 15px; border: 1px solid #444; }
+        
+        /* WBGTメイン表示 */
+        .wbgt-title { color: #aaa; font-size: 1.2rem; }
+        #wbgt-val { font-size: 6rem; font-weight: bold; margin: 10px 0; line-height: 1; }
+        #wbgt-status { display: inline-block; padding: 10px 30px; border-radius: 50px; font-size: 1.8rem; font-weight: bold; }
+
+        /* 詳細情報エリア */
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .info-item { background: #3d3d3d; padding: 15px; border-radius: 12px; }
+        .info-label { color: #888; font-size: 0.8rem; margin-bottom: 5px; }
+        .info-value { font-size: 1.2rem; font-weight: bold; }
+        
+        #debug { font-size: 0.7rem; color: #666; margin-top: 20px; }
     </style>
 </head>
 <body>
 
+<div class="container">
     <div class="card">
-        <p>大阪市住之江区 WBGT推計</p>
-        <div id="status-msg">読み込み中...</div>
+        <div class="wbgt-title">大阪市住之江区 WBGT(推計値)</div>
         <div id="wbgt-val">--</div>
+        <div id="wbgt-status">読込中</div>
     </div>
 
-    <div style="max-width: 400px; margin: auto;">
-        <canvas id="myChart"></canvas>
+    <div class="info-grid">
+        <div class="info-item">
+            <div class="info-label">現在の天気</div>
+            <div id="weather-text" class="info-value">--</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">気温</div>
+            <div id="temp-text" class="info-value">--℃</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">推定湿度</div>
+            <div id="humi-text" class="info-value">--%</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">風の状態</div>
+            <div id="wind-text" class="info-value" style="font-size: 0.9rem;">--</div>
+        </div>
     </div>
 
     <div id="debug">Initializing...</div>
+</div>
 
-    <script>
-        async function loadData() {
-            const valElem = document.getElementById('wbgt-val');
-            const msgElem = document.getElementById('status-msg');
-            const debugElem = document.getElementById('debug');
+<script>
+    async function updateDashboard() {
+        try {
+            const res = await fetch('./weather_data.json?t=' + Date.now());
+            if (!res.ok) throw new Error("データが見つかりません");
+            const data = await res.json();
 
-            try {
-                debugElem.innerText = "Fetch開始...";
-                // キャッシュ回避のため?t=を付ける
-                const res = await fetch('./weather_data.json?t=' + Date.now());
-                
-                if (!res.ok) {
-                    throw new Error("ファイルが見つかりません。Actionsが成功しているか確認してください。");
-                }
+            if (data.status === "ok") {
+                // WBGT計算 (気温ベースの簡易版)
+                const temp = parseFloat(data.temp);
+                const wbgt = (temp * 0.73 + 2.4).toFixed(1);
 
-                const data = await res.json();
-                debugElem.innerText = "データ解析中...";
+                // 各要素への表示
+                document.getElementById('wbgt-val').innerText = wbgt + "℃";
+                document.getElementById('temp-text').innerText = temp + "℃";
+                document.getElementById('weather-text').innerText = data.weather;
+                document.getElementById('wind-text').innerText = data.wind;
+                document.getElementById('humi-text').innerText = data.humidity + "%";
 
-                if (data.status === "ok") {
-                    const temp = parseFloat(data.temps[0]);
-                    const wbgt = (temp * 0.73 + 2.4).toFixed(1);
-                    
-                    valElem.innerText = wbgt + "℃";
-                    msgElem.innerText = wbgt >= 31 ? "【危険】" : wbgt >= 28 ? "【厳重警戒】" : "【注意】";
-                    valElem.style.color = wbgt >= 28 ? "orange" : "cyan";
-                    
-                    debugElem.innerText = "更新成功: " + new Date().toLocaleTimeString();
-                    showChart(data.temps);
+                // 状態バッジの色変更
+                const status = document.getElementById('wbgt-status');
+                const valDisp = document.getElementById('wbgt-val');
+                if (wbgt >= 31) {
+                    status.innerText = "危険"; status.style.background = "#ff0000"; valDisp.style.color = "#ff0000";
+                } else if (wbgt >= 28) {
+                    status.innerText = "厳重警戒"; status.style.background = "#ff9900"; valDisp.style.color = "#ff9900";
                 } else {
-                    throw new Error("データエラー: " + data.msg);
+                    status.innerText = "注意"; status.style.background = "#00b0f0"; valDisp.style.color = "#00b0f0";
                 }
 
-            } catch (e) {
-                debugElem.innerText = "状況: " + e.message;
-                valElem.innerText = "WAIT";
+                document.getElementById('debug').innerText = "最終更新: " + new Date().toLocaleTimeString();
             }
+        } catch (e) {
+            document.getElementById('debug').innerText = "エラー: " + e.message;
         }
+    }
 
-        function showChart(temps) {
-            const ctx = document.getElementById('myChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: temps.map((_, i) => i),
-                    datasets: [{ label: '気温', data: temps, borderColor: 'red' }]
-                }
-            });
-        }
+    updateDashboard();
+    setInterval(updateDashboard, 600000); // 10分ごとに更新
+</script>
 
-        loadData();
-    </script>
 </body>
 </html>
