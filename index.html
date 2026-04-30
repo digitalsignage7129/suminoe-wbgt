@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>住之江区 WBGT & 天気</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; text-align: center; padding: 20px; }
+        .card { background: white; border-radius: 15px; padding: 20px; margin: 10px auto; max-width: 500px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #wbgt-val { font-size: 3rem; font-weight: bold; }
+        .status-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; color: white; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>住之江区 暑さ指数（WBGT）</h1>
+
+    <div class="card">
+        <h2>現在の推定WBGT</h2>
+        <div id="wbgt-val">--</div>
+        <div id="wbgt-status" class="status-badge">取得中...</div>
+    </div>
+
+    <div class="card">
+        <canvas id="weatherChart"></canvas>
+    </div>
+
+    <script>
+        // 住之江区（大阪）のコード
+        const JMA_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json";
+
+        async function updateWeather() {
+            try {
+                const response = await fetch(JMA_URL);
+                const data = await response.json();
+                
+                // 大阪府のデータを抽出
+                const areaData = data[0].timeSeries[2].areas.find(a => a.area.name === "大阪市");
+                const temps = areaData.temps;
+                
+                // 簡易的なWBGT計算（気温から推定：本来は湿度が必要ですが、まずは表示の仕組み作り）
+                const currentTemp = parseFloat(temps[0]);
+                const estimatedWBGT = (currentTemp * 0.7 + 5).toFixed(1); // 簡易計算式
+
+                document.getElementById('wbgt-val').innerText = `${estimatedWBGT}℃`;
+                updateBadge(estimatedWBGT);
+                drawChart(temps);
+            } catch (e) {
+                console.error("データ取得エラー", e);
+            }
+        }
+
+        function updateBadge(val) {
+            const badge = document.getElementById('wbgt-status');
+            if (val >= 31) { badge.innerText = "危険"; badge.style.backgroundColor = "red"; }
+            else if (val >= 28) { badge.innerText = "厳重警戒"; badge.style.backgroundColor = "orange"; }
+            else { badge.innerText = "注意"; badge.style.backgroundColor = "#00b0f0"; }
+        }
+
+        function drawChart(temps) {
+            const ctx = document.getElementById('weatherChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['今日', '明日'],
+                    datasets: [{ label: '気温推移', data: temps, borderColor: 'orange', fill: false }]
+                }
+            });
+        }
+
+        updateWeather();
+    </script>
+</body>
+</html>
