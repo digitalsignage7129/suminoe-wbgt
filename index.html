@@ -26,50 +26,73 @@
         <canvas id="weatherChart"></canvas>
     </div>
 
-    <script>
-        // 住之江区（大阪）のコード
-        const JMA_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json";
+   <script>
+    const JMA_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json";
 
-        async function updateWeather() {
-            try {
-                const response = await fetch(JMA_URL);
-                const data = await response.json();
-                
-                // 大阪府のデータを抽出
-                const areaData = data[0].timeSeries[2].areas.find(a => a.area.name === "大阪市");
-                const temps = areaData.temps;
-                
-                // 簡易的なWBGT計算（気温から推定：本来は湿度が必要ですが、まずは表示の仕組み作り）
-                const currentTemp = parseFloat(temps[0]);
-                const estimatedWBGT = (currentTemp * 0.7 + 5).toFixed(1); // 簡易計算式
+    async function updateWeather() {
+        const wbgtVal = document.getElementById('wbgt-val');
+        const badge = document.getElementById('wbgt-status');
 
-                document.getElementById('wbgt-val').innerText = `${estimatedWBGT}℃`;
+        try {
+            const response = await fetch(JMA_URL);
+            if (!response.ok) throw new Error('データが取得できませんでした');
+            const data = await response.json();
+            
+            // 大阪地方の時系列データを取得
+            const timeSeries = data[0].timeSeries[2];
+            // 大阪市のインデックスを探す（通常は0番目）
+            const cityIndex = timeSeries.areas.findIndex(a => a.area.name === "大阪市");
+            const temps = timeSeries.areas[cityIndex].temps;
+            
+            // 現在の気温を取得（一番近い予報値）
+            const currentTemp = parseFloat(temps[0]);
+
+            if (isNaN(currentTemp)) {
+                wbgtVal.innerText = "確認中";
+            } else {
+                // 簡易WBGT計算（気温から算出）
+                const estimatedWBGT = (currentTemp * 0.7 + 5).toFixed(1);
+                wbgtVal.innerText = `${estimatedWBGT}℃`;
                 updateBadge(estimatedWBGT);
                 drawChart(temps);
-            } catch (e) {
-                console.error("データ取得エラー", e);
             }
-        }
 
-        function updateBadge(val) {
-            const badge = document.getElementById('wbgt-status');
-            if (val >= 31) { badge.innerText = "危険"; badge.style.backgroundColor = "red"; }
-            else if (val >= 28) { badge.innerText = "厳重警戒"; badge.style.backgroundColor = "orange"; }
-            else { badge.innerText = "注意"; badge.style.backgroundColor = "#00b0f0"; }
+        } catch (e) {
+            console.error(e);
+            wbgtVal.innerText = "ERR";
+            badge.innerText = "通信エラー";
+            badge.style.backgroundColor = "gray";
         }
+    }
 
-        function drawChart(temps) {
-            const ctx = document.getElementById('weatherChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['今日', '明日'],
-                    datasets: [{ label: '気温推移', data: temps, borderColor: 'orange', fill: false }]
-                }
-            });
-        }
+    function updateBadge(val) {
+        const badge = document.getElementById('wbgt-status');
+        if (val >= 31) { badge.innerText = "危険"; badge.style.backgroundColor = "red"; }
+        else if (val >= 28) { badge.innerText = "厳重警戒"; badge.style.backgroundColor = "orange"; }
+        else if (val >= 25) { badge.innerText = "警戒"; badge.style.backgroundColor = "#ffd700"; badge.style.color = "black"; }
+        else { badge.innerText = "注意"; badge.style.backgroundColor = "#00b0f0"; }
+    }
 
-        updateWeather();
-    </script>
-</body>
-</html>
+    function drawChart(temps) {
+        const ctx = document.getElementById('weatherChart').getContext('2d');
+        // すでにグラフがある場合は破棄して再描画（二重表示防止）
+        if (window.myChart) { window.myChart.destroy(); }
+        window.myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['今日', '今夜', '明日'],
+                datasets: [{ 
+                    label: '予想気温 (℃)', 
+                    data: temps, 
+                    borderColor: '#ff6384', 
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: { responsive: true, scales: { y: { beginAtZero: false } } }
+        });
+    }
+
+    updateWeather();
+</script>
