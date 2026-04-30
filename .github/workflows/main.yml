@@ -1,0 +1,35 @@
+name: Update Weather Data
+
+on:
+  schedule:
+    # 1時間ごとに実行 (UTCの毎時0分。日本時間の毎時9分頃反映)
+    - cron: '0 * * * *'
+  workflow_dispatch: # 手動実行用ボタン
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions: # リポジトリへの書き込み権限を与える
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Python script
+        run: python get_weather.py
+
+      - name: Commit and push if changed
+        run: |
+          git config --global user.name "Github Actions"
+          git config --global user.email "actions@github.com"
+          git add weather_data.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather data" && git push)
