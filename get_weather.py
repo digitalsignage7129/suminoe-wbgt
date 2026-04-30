@@ -2,40 +2,40 @@ import requests
 import json
 import os
 
-# 気象庁のURL（大阪府）
-JMA_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json"
-# 保存するファイル名
-OUTPUT_FILE = "weather_data.json"
-
 def fetch_weather():
+    # 気象庁（大阪府）
+    url = "https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json"
+    
     try:
-        response = requests.get(JMA_URL)
-        response.raise_for_status() # エラーなら例外を出す
-        
-        # 必要なのは「大阪市」の気温だけ
+        response = requests.get(url)
+        response.raise_for_status()
         data = response.json()
+        
+        # 大阪市の気温データを抽出
         temp_series = next(s for s in data[0]['timeSeries'] if 'temps' in s['areas'][0])
         osaka_data = next(a for a in temp_series['areas'] if a['area']['name'] == "大阪市")
+        # 空のデータを除外して数値のみにする
         temps = [t for t in osaka_data['temps'] if t != ""]
 
-        # 保存するデータ
+        if not temps:
+            raise ValueError("気温データが空です")
+
+        # ★ここが重要：辞書形式を正しく閉じる
         result = {
             "status": "ok",
             "temps": temps,
-            "updated": os.getenv('GITHUB_RUN_ID') # 更新ID
+            "updated": os.getenv('GITHUB_RUN_ID', 'manual-run')
         }
 
-        # JSONファイルとして保存
-        with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
-            
-        print(f"Successfully saved to {OUTPUT_FILE}")
-
     except Exception as e:
-        print(f"Error: {e}")
-        # エラー時はstatusをerrにする
-        with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-            json.dump({"status": "err", "msg": str(e)}, f)
+        result = {
+            "status": "err",
+            "msg": str(e)
+        }
+
+    # ファイルに書き出す
+    with open("weather_data.json", "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
     fetch_weather()
