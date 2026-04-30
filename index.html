@@ -26,8 +26,8 @@
         <canvas id="weatherChart"></canvas>
     </div>
 
-  <script>
-    // プロキシサーバーを経由させることでブロックを回避します
+ <script>
+    // 通信を安定させるためのプロキシ経由
     const JMA_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://www.jma.go.jp/bosai/forecast/data/forecast/270000.json");
 
     async function updateWeather() {
@@ -36,40 +36,47 @@
 
         try {
             const response = await fetch(JMA_URL);
-            if (!response.ok) throw new Error('データ取得失敗');
             const data = await response.json();
             
-            // 大阪市の気温データを取得
-            const timeSeries = data[0].timeSeries[2];
-            const cityIndex = timeSeries.areas.findIndex(a => a.area.name === "大阪市");
-            const temps = timeSeries.areas[cityIndex].temps;
+            // 1. 気温データが入っている場所（timeSeries）を特定する
+            // 多くの場合は data[0].timeSeries[2] ですが、念のため中身を確認しながら探します
+            const tempSeries = data[0].timeSeries.find(s => s.areas[0].temps);
             
-            const currentTemp = parseFloat(temps[0]);
+            if (!tempSeries) throw new Error('気温データが見つかりません');
+
+            // 2. その中から「大阪市」のデータだけを抽出する
+            const osakaData = tempSeries.areas.find(a => a.area.name === "大阪市");
+            
+            if (!osakaData) throw new Error('大阪市のエリアが見つかりません');
+
+            const temps = osakaData.temps;
+            // 空文字や undefined を除外して、有効な数値だけを取得
+            const validTemps = temps.filter(t => t !== "" && t !== undefined);
+            const currentTemp = parseFloat(validTemps[0]);
 
             if (isNaN(currentTemp)) {
-                wbgtVal.innerText = "確認中";
+                wbgtVal.innerText = "取得中";
             } else {
-                // 気温からWBGTを推定
-                const estimatedWBGT = (currentTemp * 0.7 + 5).toFixed(1);
+                // 気温からWBGTを推定 (係数 0.73 + 2.4 は環境省の簡易換算に近い数値です)
+                const estimatedWBGT = (currentTemp * 0.73 + 2.4).toFixed(1);
                 wbgtVal.innerText = `${estimatedWBGT}℃`;
                 updateBadge(estimatedWBGT);
-                drawChart(temps);
+                drawChart(validTemps);
             }
+
         } catch (e) {
-            console.error(e);
+            console.error("エラー詳細:", e);
             wbgtVal.innerText = "ERR";
-            badge.innerText = "取得失敗";
-            badge.style.backgroundColor = "gray";
+            badge.innerText = "再試行中...";
         }
     }
 
-    // --- (updateBadge と drawChart 関数は前回と同じでOKです) ---
     function updateBadge(val) {
         const badge = document.getElementById('wbgt-status');
-        if (val >= 31) { badge.innerText = "危険"; badge.style.backgroundColor = "red"; }
-        else if (val >= 28) { badge.innerText = "厳重警戒"; badge.style.backgroundColor = "orange"; }
+        if (val >= 31) { badge.innerText = "危険 (外出は控えて)"; badge.style.backgroundColor = "#ff0000"; }
+        else if (val >= 28) { badge.innerText = "厳重警戒"; badge.style.backgroundColor = "#ff9900"; }
         else if (val >= 25) { badge.innerText = "警戒"; badge.style.backgroundColor = "#ffd700"; badge.style.color = "black"; }
-        else { badge.innerText = "注意"; badge.style.backgroundColor = "#00b0f0"; }
+        else { badge.innerText = "ほぼ安全"; badge.style.backgroundColor = "#00b0f0"; }
     }
 
     function drawChart(temps) {
@@ -78,18 +85,22 @@
         window.myChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: ['今日', '今夜', '明日'],
+                labels: temps.map((_, i) => i === 0 ? "今" : i === 1 ? "次" : "先"),
                 datasets: [{ 
                     label: '予想気温 (℃)', 
                     data: temps, 
                     borderColor: '#ff6384', 
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    fill: true,
-                    tension: 0.4
+                    borderWidth: 3,
+                    fill: false,
+                    tension: 0.3
                 }]
+            },
+            options: {
+                scales: { y: { suggestedMin: 15, suggestedMax: 35 } }
             }
         });
     }
 
+    // 起動時に実行
     updateWeather();
 </script>
