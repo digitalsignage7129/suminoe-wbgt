@@ -37,17 +37,13 @@
 
             try {
                 debug.innerText = "データファイルを確認中...";
-                
-                // ?t=Date.now() でキャッシュを回避
                 const response = await fetch(DATA_URL + '?t=' + Date.now());
                 
                 if (!response.ok) {
-                    throw new Error("ファイルが見つかりません (404)。GitHub Pagesの反映待ちかもしれません。");
+                    throw new Error("データ(JSON)が見つかりません。反映待ちの可能性があります。");
                 }
                 
                 const data = await response.json();
-                debug.innerText = "データを解析中...";
-
                 if (data.status === "err") throw new Error(data.msg);
 
                 const temps = data.temps;
@@ -56,16 +52,18 @@
 
                 wbgtVal.innerText = wbgt + "℃";
                 
-                // 状態の更新
-                if (wbgt >= 31) { badge.innerText = "危険"; badge.style.backgroundColor = "red"; wbgtVal.style.color = "red"; }
-                else if (wbgt >= 28) { badge.innerText = "厳重警戒"; badge.style.backgroundColor = "orange"; wbgtVal.style.color = "orange"; }
-                else { badge.innerText = "注意"; badge.style.backgroundColor = "#00b0f0"; wbgtVal.style.color = "#00b0f0"; }
+                if (wbgt >= 31) { 
+                    badge.innerText = "危険"; badge.style.backgroundColor = "red"; wbgtVal.style.color = "red"; 
+                } else if (wbgt >= 28) { 
+                    badge.innerText = "厳重警戒"; badge.style.backgroundColor = "orange"; wbgtVal.style.color = "orange"; 
+                } else { 
+                    badge.innerText = "注意"; badge.style.backgroundColor = "#00b0f0"; wbgtVal.style.color = "#00b0f0"; 
+                }
 
                 drawChart(temps);
-                debug.innerText = "最終更新: " + new Date().toLocaleTimeString();
+                debug.innerText = "最終更新成功: " + new Date().toLocaleTimeString();
 
             } catch (e) {
-                console.error(e);
                 wbgtVal.innerText = "WAIT";
                 debug.innerText = "状況: " + e.message;
             }
@@ -78,7 +76,7 @@
             window.myChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: temps.map((_, i) => ["今", "夜", "明", "後"][i] || ""),
+                    labels: temps.map((_, i) => ["今日", "夜", "明日", "後"][i] || ""),
                     datasets: [{
                         data: temps,
                         borderColor: '#ff6384',
@@ -92,90 +90,6 @@
         }
 
         updateWeather();
-    </script>
-</body>
-</html>            const badge = document.getElementById('wbgt-status');
-            const debug = document.getElementById('debug-msg');
-
-            try {
-                // キャッシュを避けるためにランダムな数値を付与
-                const response = await fetch(DATA_URL + '?t=' + Date.now());
-                if (!response.ok) throw new Error('データファイル(JSON)がまだ作られていないか、読み込めません。');
-                
-                const data = await response.json();
-                
-                if (data.status === "err") throw new Error(data.msg);
-
-                const temps = data.temps;
-                const currentTemp = parseFloat(temps[0]);
-                
-                // 推計WBGT計算 (気温ベース)
-                const wbgt = (currentTemp * 0.73 + 2.4).toFixed(1);
-
-                wbgtVal.innerText = wbgt + "℃";
-                updateStatus(wbgt);
-                drawChart(temps);
-                
-                debug.innerText = "最終更新成功: " + new Date().toLocaleTimeString();
-
-            } catch (e) {
-                console.error(e);
-                wbgtVal.innerText = "WAIT";
-                badge.innerText = "更新待機中";
-                debug.innerText = "状況: " + e.message;
-            }
-        }
-
-        function updateStatus(val) {
-            const badge = document.getElementById('wbgt-status');
-            const display = document.getElementById('wbgt-val');
-            if (val >= 31) { 
-                badge.innerText = "危険"; badge.style.backgroundColor = "#ff0000"; display.style.color = "#ff0000"; 
-            } else if (val >= 28) { 
-                badge.innerText = "厳重警戒"; badge.style.backgroundColor = "#ff9900"; display.style.color = "#ff9900"; 
-            } else if (val >= 25) { 
-                badge.innerText = "警戒"; badge.style.backgroundColor = "#ffd700"; badge.style.color = "black"; display.style.color = "#ffd700"; 
-            } else { 
-                badge.innerText = "ほぼ安全"; badge.style.backgroundColor = "#00b0f0"; display.style.color = "#00b0f0"; 
-            }
-        }
-
-        function drawChart(temps) {
-            const ctx = document.getElementById('weatherChart').getContext('2d');
-            if (window.myChart) window.myChart.destroy();
-            
-            // グラフの文字色を白に設定
-            Chart.defaults.color = '#888';
-
-            window.myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: temps.map((_, i) => ["今日", "今夜", "明日", "明後日"][i] || ""),
-                    datasets: [{
-                        label: '予想気温',
-                        data: temps,
-                        borderColor: '#ff6384',
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        tension: 0.4,
-                        fill: true,
-                        pointRadius: 5
-                    }]
-                },
-                options: { 
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: { 
-                        y: { grid: { color: '#333' }, suggestedMin: 15 },
-                        x: { grid: { color: '#333' } }
-                    }
-                }
-            });
-        }
-
-        // 初回実行
-        updateWeather();
-        // 10分おきに画面を自動更新する
-        setInterval(updateWeather, 600000);
     </script>
 </body>
 </html>
