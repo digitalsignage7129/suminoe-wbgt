@@ -5,130 +5,132 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>住之江区 WBGT監視</title>
     <style>
-        /* 1. 焼き付き防止と視認性を両立した背景色 */
         body {
-            background-color: #D0D0D0; /* 真っ白を避け、反射を抑えるグレー */
+            background-color: #C0C0C0; /* 焼き付き防止：一段暗めのグレー */
             color: #000000;
             margin: 0;
             padding: 0;
-            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif;
-            font-weight: 900; /* 極太フォントで視認性を確保 */
+            font-family: sans-serif;
+            font-weight: 900;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
             width: 100vw;
-            overflow: hidden; /* 余白・スクロールを強制排除 */
+            overflow: hidden;
         }
 
-        /* 2. 1:4の細長い画面に最適化したレイアウト */
+        /* 1:4の細長画面に収めるためのグリッド */
         .container {
             display: flex;
             flex-direction: column;
-            justify-content: space-around;
+            justify-content: space-between;
             align-items: center;
-            width: 95%;
-            height: 90%;
-            text-align: center;
+            width: 98%;
+            height: 96%;
+            animation: shift 60s infinite linear; /* ピクセルシフト */
         }
 
-        .location-name {
-            font-size: 8vw; /* 地点名 */
-            margin: 0;
-        }
+        .location { font-size: 5vw; margin-top: 2vh; }
+        
+        /* WBGTメイン表示 */
+        .wbgt-section { text-align: center; }
+        .wbgt-label { font-size: 6vw; margin-bottom: -2vh; }
+        .wbgt-value { font-size: 30vw; line-height: 1; }
+        .unit { font-size: 8vw; }
 
-        .wbgt-value {
-            font-size: 35vw; /* 数値を最大化 */
-            line-height: 0.9;
-            margin: -5vw 0;
-        }
-
-        .unit {
-            font-size: 10vw;
-            margin-left: 1vw;
-        }
-
-        /* 3. 色で危険度を伝えるラベル */
+        /* 判定ラベル */
         .status-box {
             width: 90%;
-            padding: 2vh 0;
-            border-radius: 15px;
-            font-size: 12vw;
-            background-color: #888888; /* 初期色 */
-            color: #000000;
-            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            padding: 1.5vh 0;
+            border-radius: 10px;
+            font-size: 10vw;
+            text-align: center;
+            border: 3px solid #000;
         }
 
-        /* 危険度別カラー設定 */
-        .status-danger { background-color: #FF0000; color: #FFFFFF; } /* 危険 */
-        .status-severe { background-color: #FF8C00; } /* 厳重警戒 */
-        .status-warning { background-color: #FFD700; } /* 警戒 */
-        .status-caution { background-color: #ADFF2F; } /* 注意 */
-        .status-safe { background-color: #00FF7F; }    /* ほぼ安全 */
+        /* 気象データ（湿度・風速など） */
+        .weather-info {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            font-size: 6vw;
+            background: rgba(255,255,255,0.2);
+            padding: 1vh 0;
+            border-radius: 5px;
+        }
 
-        /* 4. ピクセルシフト（焼き付き防止の微細な動き） */
+        /* 判定別カラー */
+        .status-danger { background-color: #FF0000; color: #fff; }
+        .status-severe { background-color: #FF8C00; }
+        .status-warning { background-color: #FFD700; }
+        .status-caution { background-color: #ADFF2F; }
+        .status-safe { background-color: #00FF7F; }
+
         @keyframes shift {
-            0% { transform: translate(0,0); }
-            25% { transform: translate(1px, 1px); }
-            50% { transform: translate(-1px, 1px); }
-            75% { transform: translate(-1px, -1px); }
-            100% { transform: translate(0,0); }
+            0%, 100% { transform: translate(0,0); }
+            50% { transform: translate(1px, 1px); }
         }
-        .container { animation: shift 60s infinite linear; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="location-name">大阪市 住之江</div>
-        <div class="wbgt-value" id="wbgt-val">--.-<span class="unit">℃</span></div>
-        <div id="status-box" class="status-box">取得中...</div>
+        <div class="location">大阪市 住之江</div>
+        
+        <div class="wbgt-section">
+            <div class="wbgt-label">暑さ指数(WBGT)</div>
+            <div class="wbgt-value" id="wbgt-val">--.-<span class="unit">℃</span></div>
+        </div>
+
+        <div id="status-box" class="status-box">取得中</div>
+
+        <div class="weather-info">
+            <div>気温:<span id="temp">--</span>℃</div>
+            <div>湿度:<span id="humi">--</span>%</div>
+            <div>風速:<span id="wind">--</span>m</div>
+        </div>
     </div>
 
     <script>
-        // ※以前のコードで修正した正しいURLを使用してください
-        const CSV_URL = '【ここに以前のCSV取得URLを入れてください】';
+        // 住之江（大阪）のCSV URL（以前成功したものに差し替えてください）
+        const CSV_URL = '【ここに環境省のCSVのURLを入れてください】';
 
-        async function updateWBGT() {
+        async function updateData() {
             try {
                 const response = await fetch(CSV_URL);
                 const text = await response.text();
-                const rows = text.split('\n');
-                
-                // 最新の行からデータを抽出するロジック（前回のコードを流用）
-                // ここでは仮に最新の値を28.5と想定して表示ロジックのみ記載します
-                const val = 28.5; // 実際にはここをCSV解析データに書き換えてください
-                
-                const valElem = document.getElementById('wbgt-val');
-                const boxElem = document.getElementById('status-box');
+                const lines = text.trim().split('\n');
+                const lastLine = lines[lines.length - 1].split(',');
 
-                valElem.innerHTML = val.toFixed(1) + '<span class="unit">℃</span>';
+                // CSVの列：1:日時, 2:WBGT, 3:気温, 4:湿度, 5:風速（環境省形式）
+                const wbgt = parseFloat(lastLine[1]);
+                const temp = parseFloat(lastLine[2]);
+                const humi = parseFloat(lastLine[3]);
+                const wind = parseFloat(lastLine[4]);
 
-                // 危険度判定とデザイン変更
-                if (val >= 31) {
-                    boxElem.innerText = "危険";
-                    boxElem.className = "status-box status-danger";
-                } else if (val >= 28) {
-                    boxElem.innerText = "厳重警戒";
-                    boxElem.className = "status-box status-severe";
-                } else if (val >= 25) {
-                    boxElem.innerText = "警戒";
-                    boxElem.className = "status-box status-warning";
-                } else if (val >= 21) {
-                    boxElem.innerText = "注意";
-                    boxElem.className = "status-box status-caution";
-                } else {
-                    boxElem.innerText = "ほぼ安全";
-                    boxElem.className = "status-box status-safe";
-                }
-            } catch (error) {
-                console.error('データ取得失敗', error);
+                // 数値表示
+                document.getElementById('wbgt-val').innerHTML = wbgt.toFixed(1) + '<span class="unit">℃</span>';
+                document.getElementById('temp').innerText = temp.toFixed(1);
+                document.getElementById('humi').innerText = humi;
+                document.getElementById('wind').innerText = wind.toFixed(1);
+
+                // 判定
+                const box = document.getElementById('status-box');
+                if (wbgt >= 31) { box.innerText = "危険"; box.className = "status-box status-danger"; }
+                else if (wbgt >= 28) { box.innerText = "厳重警戒"; box.className = "status-box status-severe"; }
+                else if (wbgt >= 25) { box.innerText = "警戒"; box.className = "status-box status-warning"; }
+                else if (wbgt >= 21) { box.innerText = "注意"; box.className = "status-box status-caution"; }
+                else { box.innerText = "ほぼ安全"; box.className = "status-box status-safe"; }
+
+            } catch (e) {
+                document.getElementById('status-box').innerText = "エラー";
             }
         }
 
-        updateWBGT();
-        setInterval(updateWBGT, 600000); // 10分ごとに更新
+        updateData();
+        setInterval(updateData, 600000); // 10分更新
     </script>
 </body>
 </html>
