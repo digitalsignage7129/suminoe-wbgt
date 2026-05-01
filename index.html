@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>住之江区 WBGT監視</title>
+    <title>住之江区 WBGT監視 (Black Edition)</title>
     <style>
+        /* 背景黒・文字白の固定設定 */
         body {
-            background-color: #C0C0C0; /* 焼き付き防止：一段暗めのグレー */
-            color: #000000;
+            background-color: #000000;
+            color: #FFFFFF;
             margin: 0;
             padding: 0;
-            font-family: sans-serif;
+            font-family: "Arial Black", "Helvetica Neue", sans-serif;
             font-weight: 900;
             display: flex;
             flex-direction: column;
@@ -21,52 +22,50 @@
             overflow: hidden;
         }
 
-        /* 1:4の細長画面に収めるためのグリッド */
         .container {
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: space-around;
             align-items: center;
             width: 98%;
-            height: 96%;
-            animation: shift 60s infinite linear; /* ピクセルシフト */
+            height: 95%;
+            /* 焼き付き防止：1pxだけゆっくり動かす */
+            animation: shift 60s infinite linear;
         }
 
-        .location { font-size: 5vw; margin-top: 2vh; }
-        
-        /* WBGTメイン表示 */
-        .wbgt-section { text-align: center; }
-        .wbgt-label { font-size: 6vw; margin-bottom: -2vh; }
-        .wbgt-value { font-size: 30vw; line-height: 1; }
-        .unit { font-size: 8vw; }
+        .location { font-size: 6vw; }
+
+        .wbgt-section { text-align: center; width: 100%; }
+        .wbgt-label { font-size: 7vw; margin-bottom: -1vh; color: #AAAAAA; }
+        .wbgt-value { font-size: 38vw; line-height: 1; }
+        .unit { font-size: 10vw; }
 
         /* 判定ラベル */
         .status-box {
-            width: 90%;
-            padding: 1.5vh 0;
-            border-radius: 10px;
-            font-size: 10vw;
+            width: 92%;
+            padding: 2vh 0;
+            border-radius: 12px;
+            font-size: 14vw;
             text-align: center;
-            border: 3px solid #000;
+            border: 4px solid #FFFFFF;
+            transition: all 0.5s ease;
         }
 
-        /* 気象データ（湿度・風速など） */
+        /* 判定別カラー（文字は黒にして可読性を確保） */
+        .status-danger { background-color: #FF0000; color: #000; }
+        .status-severe { background-color: #FF8C00; color: #000; }
+        .status-warning { background-color: #FFD700; color: #000; }
+        .status-caution { background-color: #ADFF2F; color: #000; }
+        .status-safe { background-color: #00FF7F; color: #000; }
+
         .weather-info {
             display: flex;
             justify-content: space-around;
             width: 100%;
-            font-size: 6vw;
-            background: rgba(255,255,255,0.2);
-            padding: 1vh 0;
-            border-radius: 5px;
+            font-size: 8vw;
+            border-top: 2px solid #444;
+            padding-top: 2vh;
         }
-
-        /* 判定別カラー */
-        .status-danger { background-color: #FF0000; color: #fff; }
-        .status-severe { background-color: #FF8C00; }
-        .status-warning { background-color: #FFD700; }
-        .status-caution { background-color: #ADFF2F; }
-        .status-safe { background-color: #00FF7F; }
 
         @keyframes shift {
             0%, 100% { transform: translate(0,0); }
@@ -77,14 +76,14 @@
 <body>
 
     <div class="container">
-        <div class="location">大阪市 住之江</div>
+        <div class="location">大阪市 住之江付近</div>
         
         <div class="wbgt-section">
             <div class="wbgt-label">暑さ指数(WBGT)</div>
             <div class="wbgt-value" id="wbgt-val">--.-<span class="unit">℃</span></div>
         </div>
 
-        <div id="status-box" class="status-box">取得中</div>
+        <div id="status-box" class="status-box">接続中</div>
 
         <div class="weather-info">
             <div>気温:<span id="temp">--</span>℃</div>
@@ -94,43 +93,71 @@
     </div>
 
     <script>
-        // 住之江（大阪）のCSV URL（以前成功したものに差し替えてください）
-        const CSV_URL = '【ここに環境省のCSVのURLを入れてください】';
+        // 環境省の大阪地点(62078)のCSVデータURL
+        const CSV_URL = 'https://www.wbgt.env.go.jp/prev15met/csv/62078.csv';
 
         async function updateData() {
             try {
-                const response = await fetch(CSV_URL);
+                // ブラウザのキャッシュ対策のためURLにタイムスタンプを付与
+                const response = await fetch(CSV_URL + '?t=' + new Date().getTime());
                 const text = await response.text();
-                const lines = text.trim().split('\n');
-                const lastLine = lines[lines.length - 1].split(',');
+                
+                // 空行を除去して配列化
+                const lines = text.trim().split('\n').filter(line => line.trim() !== "");
+                
+                let lastLine = null;
+                // 末尾から順に、2列目が数値である有効なデータ行を探す
+                for (let i = lines.length - 1; i >= 0; i--) {
+                    const columns = lines[i].split(',');
+                    if (columns.length >= 5 && !isNaN(parseFloat(columns[1]))) {
+                        lastLine = columns;
+                        break;
+                    }
+                }
 
-                // CSVの列：1:日時, 2:WBGT, 3:気温, 4:湿度, 5:風速（環境省形式）
+                if (!lastLine) throw new Error("有効なデータが見つかりません");
+
+                // CSV解析：1:日時, 2:WBGT, 3:気温, 4:湿度, 5:風速
                 const wbgt = parseFloat(lastLine[1]);
                 const temp = parseFloat(lastLine[2]);
                 const humi = parseFloat(lastLine[3]);
                 const wind = parseFloat(lastLine[4]);
 
-                // 数値表示
+                // 画面への反映
                 document.getElementById('wbgt-val').innerHTML = wbgt.toFixed(1) + '<span class="unit">℃</span>';
                 document.getElementById('temp').innerText = temp.toFixed(1);
-                document.getElementById('humi').innerText = humi;
+                document.getElementById('humi').innerText = Math.round(humi);
                 document.getElementById('wind').innerText = wind.toFixed(1);
 
-                // 判定
+                // 危険度判定とデザイン変更
                 const box = document.getElementById('status-box');
-                if (wbgt >= 31) { box.innerText = "危険"; box.className = "status-box status-danger"; }
-                else if (wbgt >= 28) { box.innerText = "厳重警戒"; box.className = "status-box status-severe"; }
-                else if (wbgt >= 25) { box.innerText = "警戒"; box.className = "status-box status-warning"; }
-                else if (wbgt >= 21) { box.innerText = "注意"; box.className = "status-box status-caution"; }
-                else { box.innerText = "ほぼ安全"; box.className = "status-box status-safe"; }
+                if (wbgt >= 31) { 
+                    box.innerText = "危険"; 
+                    box.className = "status-box status-danger"; 
+                } else if (wbgt >= 28) { 
+                    box.innerText = "厳重警戒"; 
+                    box.className = "status-box status-severe"; 
+                } else if (wbgt >= 25) { 
+                    box.innerText = "警戒"; 
+                    box.className = "status-box status-warning"; 
+                } else if (wbgt >= 21) { 
+                    box.innerText = "注意"; 
+                    box.className = "status-box status-caution"; 
+                } else { 
+                    box.innerText = "ほぼ安全"; 
+                    box.className = "status-box status-safe"; 
+                }
 
             } catch (e) {
-                document.getElementById('status-box').innerText = "エラー";
+                console.error("データ取得エラー:", e);
+                document.getElementById('status-box').innerText = "更新待機中";
             }
         }
 
+        // 初回実行
         updateData();
-        setInterval(updateData, 600000); // 10分更新
+        // 10分ごとに自動更新
+        setInterval(updateData, 600000);
     </script>
 </body>
 </html>
