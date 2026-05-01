@@ -48,7 +48,6 @@
             font-size: 14vw;
             text-align: center;
             border: 4px solid #FFFFFF;
-            transition: all 0.5s ease;
         }
 
         /* 判定別カラー（文字は黒にして可読性を確保） */
@@ -83,7 +82,7 @@
             <div class="wbgt-value" id="wbgt-val">--.-<span class="unit">℃</span></div>
         </div>
 
-        <div id="status-box" class="status-box">接続中</div>
+        <div id="status-box" class="status-box">取得中</div>
 
         <div class="weather-info">
             <div>気温:<span id="temp">--</span>℃</div>
@@ -93,35 +92,20 @@
     </div>
 
     <script>
-        // 環境省の大阪地点(62078)のCSVデータURL
-        const CSV_URL = 'https://www.wbgt.env.go.jp/prev15met/csv/62078.csv';
+        // 以前作成したJSONファイルの名前を指定
+        const JSON_URL = './weather_data.json';
 
         async function updateData() {
             try {
-                // ブラウザのキャッシュ対策のためURLにタイムスタンプを付与
-                const response = await fetch(CSV_URL + '?t=' + new Date().getTime());
-                const text = await response.text();
-                
-                // 空行を除去して配列化
-                const lines = text.trim().split('\n').filter(line => line.trim() !== "");
-                
-                let lastLine = null;
-                // 末尾から順に、2列目が数値である有効なデータ行を探す
-                for (let i = lines.length - 1; i >= 0; i--) {
-                    const columns = lines[i].split(',');
-                    if (columns.length >= 5 && !isNaN(parseFloat(columns[1]))) {
-                        lastLine = columns;
-                        break;
-                    }
-                }
+                // キャッシュを避けるためにタイムスタンプを付与
+                const response = await fetch(JSON_URL + '?t=' + new Date().getTime());
+                const data = await response.json();
 
-                if (!lastLine) throw new Error("有効なデータが見つかりません");
-
-                // CSV解析：1:日時, 2:WBGT, 3:気温, 4:湿度, 5:風速
-                const wbgt = parseFloat(lastLine[1]);
-                const temp = parseFloat(lastLine[2]);
-                const humi = parseFloat(lastLine[3]);
-                const wind = parseFloat(lastLine[4]);
+                // JSON内のキー名（以前のPythonの設計に合わせています）
+                const wbgt = parseFloat(data.wbgt);
+                const temp = parseFloat(data.temp);
+                const humi = parseFloat(data.humi);
+                const wind = parseFloat(data.wind);
 
                 // 画面への反映
                 document.getElementById('wbgt-val').innerHTML = wbgt.toFixed(1) + '<span class="unit">℃</span>';
@@ -129,7 +113,7 @@
                 document.getElementById('humi').innerText = Math.round(humi);
                 document.getElementById('wind').innerText = wind.toFixed(1);
 
-                // 危険度判定とデザイン変更
+                // 危険度判定
                 const box = document.getElementById('status-box');
                 if (wbgt >= 31) { 
                     box.innerText = "危険"; 
@@ -150,13 +134,12 @@
 
             } catch (e) {
                 console.error("データ取得エラー:", e);
-                document.getElementById('status-box').innerText = "更新待機中";
+                document.getElementById('status-box').innerText = "データ更新中";
             }
         }
 
-        // 初回実行
         updateData();
-        // 10分ごとに自動更新
+        // 10分ごとに更新を確認
         setInterval(updateData, 600000);
     </script>
 </body>
