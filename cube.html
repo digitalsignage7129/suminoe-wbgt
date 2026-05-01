@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        /* 128pxの5面サイネージ専用設計 */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background-color: #000;
@@ -15,6 +14,7 @@
             display: flex;
         }
 
+        /* 128x128のパネル */
         .panel {
             width: 128px;
             height: 128px;
@@ -22,78 +22,76 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            border-right: 1px solid #333;
+            border-right: 2px solid #222;
             position: relative;
         }
 
-        /* 項目名（上部） */
-        .label {
-            font-size: 14px;
-            color: #aaa;
-            position: absolute;
-            top: 15px;
+        /* 強調パネル（騒音・振動用） */
+        .highlight {
+            background-color: #000;
         }
 
-        /* 数値（中央） */
+        .label {
+            font-size: 18px;
+            color: #00FF00; /* 目立つネオングリーン */
+            position: absolute;
+            top: 8px;
+        }
+
+        /* 数値をパネルの横幅いっぱいに強調 */
         .value {
-            font-size: 32px;
+            font-size: 48px; 
             font-weight: 900;
+            line-height: 1;
             margin-top: 10px;
         }
 
-        /* 単位（数値の右下） */
-        .unit { font-size: 14px; margin-left: 2px; }
+        .unit { font-size: 18px; color: #888; margin-top: 2px; }
 
-        /* 焼き付き防止アニメーション */
-        .container {
-            display: flex;
-            width: 640px;
-            height: 128px;
-            animation: move 60s infinite linear;
-        }
-        @keyframes move {
-            0%, 100% { transform: translate(0, 0); }
+        /* サブ情報 */
+        .sub-label { font-size: 14px; color: #666; position: absolute; top: 10px; }
+        .sub-value { font-size: 28px; margin-top: 10px; }
+
+        /* 焼き付き防止 */
+        .container { display: flex; animation: shift 60s infinite linear; }
+        @keyframes shift {
+            0%, 100% { transform: translate(0,0); }
             50% { transform: translate(1px, 1px); }
         }
-
-        /* 危険度別の色 */
-        .bg-blue { background-color: #007BFF; }
-        .bg-red { background-color: #FF0000; }
-        .bg-orange { background-color: #FF8C00; }
-        .bg-yellow { background-color: #FFD700; color: #000; }
-        .bg-green { background-color: #ADFF2F; color: #000; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- 1面目: 日付 -->
-        <div class="panel">
-            <div class="label">DATE</div>
-            <div class="value" id="d-val">--/--</div>
+        <!-- 1面: 騒音（最大強調） -->
+        <div class="panel highlight">
+            <div class="label">騒音</div>
+            <div class="value" id="n-val">--</div>
+            <div class="unit">dB</div>
         </div>
 
-        <!-- 2面目: WBGT (色が変わる) -->
+        <!-- 2面: 振動（最大強調） -->
+        <div class="panel highlight">
+            <div class="label" style="color: #FF00FF;">振動</div>
+            <div class="value" id="v-val">--</div>
+            <div class="unit">dB</div>
+        </div>
+
+        <!-- 3面: WBGT -->
         <div class="panel" id="wbgt-panel">
-            <div class="label">WBGT</div>
-            <div class="value" id="w-val">--.-<span class="unit">℃</span></div>
+            <div class="sub-label">WBGT</div>
+            <div class="sub-value" id="w-val">--.-℃</div>
         </div>
 
-        <!-- 3面目: 気温 -->
+        <!-- 4面: 気温 -->
         <div class="panel">
-            <div class="label">TEMP</div>
-            <div class="value" id="t-val">--<span class="unit">℃</span></div>
+            <div class="sub-label">TEMP</div>
+            <div class="sub-value" id="t-val">--℃</div>
         </div>
 
-        <!-- 4面目: 騒音 -->
-        <div class="panel">
-            <div class="label">NOISE</div>
-            <div class="value" id="n-val">--<span class="unit">dB</span></div>
-        </div>
-
-        <!-- 5面目: 振動 -->
+        <!-- 5面: 日付 -->
         <div class="panel" style="border:none;">
-            <div class="label">VIB</div>
-            <div class="value" id="v-val">--<span class="unit">dB</span></div>
+            <div class="sub-label">DATE</div>
+            <div class="sub-value" id="date">--/--</div>
         </div>
     </div>
 
@@ -103,30 +101,30 @@
                 const res = await fetch('./weather_data.json?t=' + Date.now());
                 const data = await res.json();
 
-                // 日付
-                const now = new Date();
-                document.getElementById('d-val').innerText = (now.getMonth()+1) + '/' + now.getDate();
-
-                // 数値
-                const wbgt = parseFloat(data.wbgt);
-                document.getElementById('w-val').innerHTML = wbgt.toFixed(1) + '<span class="unit">℃</span>';
-                document.getElementById('t-val').innerHTML = data.temp + '<span class="unit">℃</span>';
+                // 騒音・振動（メインの切り抜き部分）
                 document.getElementById('n-val').innerText = data.noise || "--";
                 document.getElementById('v-val').innerText = data.vib || "--";
 
-                // WBGTパネルの色変更
+                // WBGT・気温
+                const wbgt = parseFloat(data.wbgt);
+                document.getElementById('w-val').innerText = wbgt.toFixed(1) + '℃';
+                document.getElementById('t-val').innerText = data.temp + '℃';
+
+                // 日付
+                const now = new Date();
+                document.getElementById('date').innerText = (now.getMonth()+1) + '/' + now.getDate();
+
+                // WBGT色変更
                 const wp = document.getElementById('wbgt-panel');
-                wp.className = "panel"; // 一旦リセット
-                if (wbgt >= 31) wp.classList.add("bg-red");
-                else if (wbgt >= 28) wp.classList.add("bg-orange");
-                else if (wbgt >= 25) wp.classList.add("bg-yellow");
-                else if (wbgt >= 21) wp.classList.add("bg-green");
-                else wp.classList.add("bg-blue");
+                if (wbgt >= 31) wp.style.backgroundColor = "#FF0000";
+                else if (wbgt >= 28) wp.style.backgroundColor = "#FF8C00";
+                else if (wbgt >= 25) wp.style.backgroundColor = "#FFD700";
+                else wp.style.backgroundColor = "#000";
 
             } catch (e) { console.error(e); }
         }
         update();
-        setInterval(update, 600000);
+        setInterval(update, 300000); // 5分更新
     </script>
 </body>
 </html>
