@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>住之江区 WBGT監視 (Black Edition)</title>
     <style>
-        /* 背景黒・文字白の固定設定 */
         body {
             background-color: #000000;
             color: #FFFFFF;
             margin: 0;
             padding: 0;
-            font-family: "Arial Black", "Helvetica Neue", sans-serif;
+            font-family: "Arial Black", "Hiragino Sans", sans-serif;
             font-weight: 900;
             display: flex;
             flex-direction: column;
@@ -28,43 +27,62 @@
             justify-content: space-around;
             align-items: center;
             width: 98%;
-            height: 95%;
-            /* 焼き付き防止：1pxだけゆっくり動かす */
+            height: 98%;
             animation: shift 60s infinite linear;
         }
 
-        .location { font-size: 6vw; }
-
         .wbgt-section { text-align: center; width: 100%; }
-        .wbgt-label { font-size: 7vw; margin-bottom: -1vh; color: #AAAAAA; }
-        .wbgt-value { font-size: 38vw; line-height: 1; }
-        .unit { font-size: 10vw; }
+        .wbgt-label { font-size: 6vw; color: #AAAAAA; }
+        .wbgt-value { font-size: 38vw; line-height: 0.8; margin: 1vh 0; }
+        .unit-large { font-size: 10vw; }
 
-        /* 判定ラベル */
         .status-box {
-            width: 92%;
-            padding: 2vh 0;
-            border-radius: 12px;
+            width: 95%;
+            padding: 1.5vh 0;
+            border-radius: 10px;
             font-size: 14vw;
             text-align: center;
             border: 4px solid #FFFFFF;
         }
 
-        /* 判定別カラー（文字は黒にして可読性を確保） */
+        /* 気象情報のレイアウト改善 */
+        .weather-grid {
+            display: flex;
+            flex-direction: column; /* 情報を縦に積み上げる */
+            width: 95%;
+            border-top: 2px solid #444;
+            padding-top: 1vh;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1vh;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
+
+        .info-label { font-size: 4vw; color: #AAAAAA; }
+        .info-data { font-size: 7vw; text-align: center; white-space: nowrap; overflow: hidden; }
+
+        /* 天気などの長い文章用 */
+        .full-width-item {
+            width: 100%;
+            text-align: center;
+            border-top: 1px solid #333;
+            padding-top: 0.5vh;
+        }
+
         .status-danger { background-color: #FF0000; color: #000; }
         .status-severe { background-color: #FF8C00; color: #000; }
         .status-warning { background-color: #FFD700; color: #000; }
         .status-caution { background-color: #ADFF2F; color: #000; }
         .status-safe { background-color: #00FF7F; color: #000; }
-
-        .weather-info {
-            display: flex;
-            justify-content: space-around;
-            width: 100%;
-            font-size: 8vw;
-            border-top: 2px solid #444;
-            padding-top: 2vh;
-        }
 
         @keyframes shift {
             0%, 100% { transform: translate(0,0); }
@@ -75,71 +93,66 @@
 <body>
 
     <div class="container">
-        <div class="location">大阪市 住之江付近</div>
-        
         <div class="wbgt-section">
-            <div class="wbgt-label">暑さ指数(WBGT)</div>
-            <div class="wbgt-value" id="wbgt-val">--.-<span class="unit">℃</span></div>
+            <div class="wbgt-label">暑さ指数</div>
+            <div class="wbgt-value" id="wbgt-val">--.-<span class="unit-large">℃</span></div>
         </div>
 
         <div id="status-box" class="status-box">取得中</div>
 
-        <div class="weather-info">
-            <div>気温:<span id="temp">--</span>℃</div>
-            <div>湿度:<span id="humi">--</span>%</div>
-            <div>風速:<span id="wind">--</span>m</div>
+        <div class="weather-grid">
+            <div class="info-row">
+                <div class="info-item">
+                    <div class="info-label">気温</div>
+                    <div class="info-data"><span id="temp">--</span>℃</div>
+                </div>
+                <div class="info-item" style="border-left: 1px solid #333;">
+                    <div class="info-label">風向き</div>
+                    <div class="info-data" id="wind-short">--</div>
+                </div>
+            </div>
+            <div class="full-width-item">
+                <div class="info-label">天気</div>
+                <div class="info-data" id="weather-text" style="font-size: 5vw;">--</div>
+            </div>
         </div>
     </div>
 
     <script>
-        // 以前作成したJSONファイルの名前を指定
         const JSON_URL = './weather_data.json';
 
         async function updateData() {
             try {
-                // キャッシュを避けるためにタイムスタンプを付与
                 const response = await fetch(JSON_URL + '?t=' + new Date().getTime());
                 const data = await response.json();
 
-                // JSON内のキー名（以前のPythonの設計に合わせています）
+                // WBGTと気温の表示
                 const wbgt = parseFloat(data.wbgt);
-                const temp = parseFloat(data.temp);
-                const humi = parseFloat(data.humi);
-                const wind = parseFloat(data.wind);
+                document.getElementById('wbgt-val').innerHTML = wbgt.toFixed(1) + '<span class="unit-large">℃</span>';
+                document.getElementById('temp').innerText = data.temp;
 
-                // 画面への反映
-                document.getElementById('wbgt-val').innerHTML = wbgt.toFixed(1) + '<span class="unit">℃</span>';
-                document.getElementById('temp').innerText = temp.toFixed(1);
-                document.getElementById('humi').innerText = Math.round(humi);
-                document.getElementById('wind').innerText = wind.toFixed(1);
+                // 風速（文章の最初だけ切り出す）
+                const windText = data.wind || "";
+                document.getElementById('wind-short').innerText = windText.split('　')[0]; // 「西の風」など
 
-                // 危険度判定
+                // 天気
+                document.getElementById('weather-text').innerText = data.weather || "--";
+
+                // 判定
                 const box = document.getElementById('status-box');
-                if (wbgt >= 31) { 
-                    box.innerText = "危険"; 
-                    box.className = "status-box status-danger"; 
-                } else if (wbgt >= 28) { 
-                    box.innerText = "厳重警戒"; 
-                    box.className = "status-box status-severe"; 
-                } else if (wbgt >= 25) { 
-                    box.innerText = "警戒"; 
-                    box.className = "status-box status-warning"; 
-                } else if (wbgt >= 21) { 
-                    box.innerText = "注意"; 
-                    box.className = "status-box status-caution"; 
-                } else { 
-                    box.innerText = "ほぼ安全"; 
-                    box.className = "status-box status-safe"; 
-                }
+                if (wbgt >= 31) { box.innerText = "危険"; box.className = "status-box status-danger"; }
+                else if (wbgt >= 28) { box.innerText = "厳重警戒"; box.className = "status-box status-severe"; }
+                else if (wbgt >= 25) { box.innerText = "警戒"; box.className = "status-box status-warning"; }
+                else if (wbgt >= 21) { box.innerText = "注意"; box.className = "status-box status-caution"; }
+                else { box.innerText = "ほぼ安全"; box.className = "status-box status-safe"; }
 
             } catch (e) {
-                console.error("データ取得エラー:", e);
-                document.getElementById('status-box').innerText = "データ更新中";
+                console.error(e);
+                document.getElementById('status-box').innerText = "更新待機中";
             }
         }
 
         updateData();
-        // 10分ごとに更新を確認
         setInterval(updateData, 600000);
     </script>
 </body>
