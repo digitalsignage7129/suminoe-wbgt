@@ -13,24 +13,18 @@
             overflow: hidden;
             display: flex;
         }
-        .container { display: flex; width: 640px; height: 128px; animation: shift 60s infinite linear; }
+        .container { display: flex; width: 640px; height: 128px; }
         .panel {
             width: 128px; height: 128px;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             border-right: 1px solid #333; position: relative;
         }
-        .label { font-size: 16px; color: #00FF00; position: absolute; top: 10px; font-weight: bold; }
-        .value { font-size: 44px; font-weight: 900; margin-top: 15px; }
+        .label { font-size: 18px; color: #00FF00; position: absolute; top: 10px; font-weight: bold; }
+        .value { font-size: 50px; font-weight: 900; line-height: 1; margin-top: 10px; }
         .unit { font-size: 16px; color: #888; }
-        .sub-label { font-size: 12px; color: #666; position: absolute; top: 10px; }
-        .sub-value { font-size: 26px; margin-top: 12px; }
         
-        #wbgt-panel.bg-red { background-color: #FF0000; }
-        #wbgt-panel.bg-orange { background-color: #FF8C00; }
-        #wbgt-panel.bg-yellow { background-color: #FFD700; color: #000; }
-        #wbgt-panel.bg-blue { background-color: #007BFF; }
-
-        @keyframes shift { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(1px, 1px); } }
+        /* 振動パネルの色 */
+        .vib-label { color: #FF00FF; }
     </style>
 </head>
 <body>
@@ -43,48 +37,46 @@
         </div>
         <!-- 振動面 -->
         <div class="panel">
-            <div class="label" style="color: #FF00FF;">振動</div>
+            <div class="label vib-label">振動</div>
             <div class="value" id="v-val">--</div>
             <div class="unit">dB</div>
         </div>
-        <!-- WBGT面 -->
-        <div class="panel" id="wbgt-panel">
-            <div class="sub-label">WBGT</div>
-            <div class="sub-value" id="w-val">--.-℃</div>
-        </div>
-        <!-- 気温面 -->
-        <div class="panel">
-            <div class="sub-label">TEMP</div>
-            <div class="sub-value" id="t-val">--℃</div>
-        </div>
-        <!-- 日付面 -->
-        <div class="panel" style="border:none;">
-            <div class="sub-label">DATE</div>
-            <div class="sub-value" id="date">--/--</div>
+        
+        <!-- 他の面は以前と同じ（またはiframeで現場サイトを埋め込み） -->
+        <div id="extra-panels" style="display:flex;">
+             <div class="panel"><div class="value" style="font-size:20px;">LOADING</div></div>
         </div>
     </div>
+
     <script>
-        async function update() {
+        // 現場のサイトから数値を直接抽出する関数
+        async function fetchRealtimeData() {
+            const targetUrl = "https://www2.edam.ne.jp/Public/00642/Sokutei/SSC/RN?LoId=738";
+            
             try {
-                const res = await fetch('./weather_data.json?t=' + Date.now());
-                const data = await res.json();
-                document.getElementById('n-val').innerText = data.noise || "--";
-                document.getElementById('v-val').innerText = data.vib || "--";
-                const wbgt = parseFloat(data.wbgt);
-                document.getElementById('w-val').innerText = wbgt.toFixed(1) + '℃';
-                document.getElementById('t-val').innerText = data.temp + '℃';
-                const now = new Date();
-                document.getElementById('date').innerText = (now.getMonth()+1) + '/' + now.getDate();
-                const wp = document.getElementById('wbgt-panel');
-                wp.className = "panel";
-                if (wbgt >= 31) wp.classList.add("bg-red");
-                else if (wbgt >= 28) wp.classList.add("bg-orange");
-                else if (wbgt >= 25) wp.classList.add("bg-yellow");
-                else if (wbgt < 21) wp.classList.add("bg-blue");
-            } catch (e) { console.error(e); }
+                // CORS回避のためにプロキシサービス（allorigins等）を経由して取得
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+                const response = await fetch(proxyUrl);
+                const data = await response.json();
+                
+                // HTML文字列から数値を抽出
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(data.contents, 'text/html');
+                
+                const noise = doc.getElementById('cur_souon')?.textContent || "--";
+                const vib = doc.getElementById('cur_shindou')?.textContent || "--";
+
+                document.getElementById('n-val').innerText = noise;
+                document.getElementById('v-val').innerText = vib;
+
+            } catch (e) {
+                console.error("データ取得エラー", e);
+            }
         }
-        update();
-        setInterval(update, 60000);
+
+        // 3秒ごとに実行
+        setInterval(fetchRealtimeData, 3000);
+        fetchRealtimeData();
     </script>
 </body>
 </html>
