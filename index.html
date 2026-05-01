@@ -33,9 +33,10 @@
 
         .wbgt-section { text-align: center; width: 100%; }
         .wbgt-label { font-size: 6vw; color: #AAAAAA; }
-        .wbgt-value { font-size: 38vw; line-height: 0.8; margin: 1vh 0; }
+        .wbgt-value { font-size: 42vw; line-height: 0.8; margin: 1vh 0; }
         .unit-large { font-size: 10vw; }
 
+        /* 判定ボックス */
         .status-box {
             width: 95%;
             padding: 1.5vh 0;
@@ -45,10 +46,10 @@
             border: 4px solid #FFFFFF;
         }
 
-        /* 気象情報のレイアウト改善 */
+        /* 気象情報エリア */
         .weather-grid {
             display: flex;
-            flex-direction: column; /* 情報を縦に積み上げる */
+            flex-direction: column;
             width: 95%;
             border-top: 2px solid #444;
             padding-top: 1vh;
@@ -57,7 +58,7 @@
         .info-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 1vh;
+            margin-bottom: 0.5vh;
         }
 
         .info-item {
@@ -68,21 +69,30 @@
         }
 
         .info-label { font-size: 4vw; color: #AAAAAA; }
-        .info-data { font-size: 7vw; text-align: center; white-space: nowrap; overflow: hidden; }
+        .info-data { font-size: 7vw; text-align: center; }
 
-        /* 天気などの長い文章用 */
+        /* 天気：文章が長い場合に備えて少しフォントを調整 */
         .full-width-item {
             width: 100%;
             text-align: center;
             border-top: 1px solid #333;
             padding-top: 0.5vh;
+            min-height: 12vh;
         }
 
-        .status-danger { background-color: #FF0000; color: #000; }
-        .status-severe { background-color: #FF8C00; color: #000; }
-        .status-warning { background-color: #FFD700; color: #000; }
-        .status-caution { background-color: #ADFF2F; color: #000; }
-        .status-safe { background-color: #00FF7F; color: #000; }
+        .weather-text {
+            font-size: 4.5vw;
+            line-height: 1.2;
+            display: block;
+            margin-top: 0.5vh;
+        }
+
+        /* 判定別カラー設定 */
+        .status-danger { background-color: #FF0000; color: #000; }  /* 危険:赤 */
+        .status-severe { background-color: #FF8C00; color: #000; }  /* 厳重警戒:橙 */
+        .status-warning { background-color: #FFD700; color: #000; } /* 警戒:黄 */
+        .status-caution { background-color: #ADFF2F; color: #000; } /* 注意:黄緑 */
+        .status-safe { background-color: #007BFF; color: #FFF; }    /* ほぼ安全:青(文字白) */
 
         @keyframes shift {
             0%, 100% { transform: translate(0,0); }
@@ -112,8 +122,8 @@
                 </div>
             </div>
             <div class="full-width-item">
-                <div class="info-label">天気</div>
-                <div class="info-data" id="weather-text" style="font-size: 5vw;">--</div>
+                <div class="info-label">現在の天気</div>
+                <div class="weather-text" id="weather-text">--</div>
             </div>
         </div>
     </div>
@@ -126,29 +136,40 @@
                 const response = await fetch(JSON_URL + '?t=' + new Date().getTime());
                 const data = await response.json();
 
-                // WBGTと気温の表示
+                // 数値データの反映
                 const wbgt = parseFloat(data.wbgt);
                 document.getElementById('wbgt-val').innerHTML = wbgt.toFixed(1) + '<span class="unit-large">℃</span>';
                 document.getElementById('temp').innerText = data.temp;
 
-                // 風速（文章の最初だけ切り出す）
+                // 風向きの処理（最初のスペースまでを表示）
                 const windText = data.wind || "";
-                document.getElementById('wind-short').innerText = windText.split('　')[0]; // 「西の風」など
+                document.getElementById('wind-short').innerText = windText.split('　')[0] || "不明";
 
-                // 天気
+                // 天気の処理（長すぎる場合に備えて）
                 document.getElementById('weather-text').innerText = data.weather || "--";
 
-                // 判定
+                // 危険度判定と色の更新
                 const box = document.getElementById('status-box');
-                if (wbgt >= 31) { box.innerText = "危険"; box.className = "status-box status-danger"; }
-                else if (wbgt >= 28) { box.innerText = "厳重警戒"; box.className = "status-box status-severe"; }
-                else if (wbgt >= 25) { box.innerText = "警戒"; box.className = "status-box status-warning"; }
-                else if (wbgt >= 21) { box.innerText = "注意"; box.className = "status-box status-caution"; }
-                else { box.innerText = "ほぼ安全"; box.className = "status-box status-safe"; }
+                if (wbgt >= 31) { 
+                    box.innerText = "危険"; 
+                    box.className = "status-box status-danger"; 
+                } else if (wbgt >= 28) { 
+                    box.innerText = "厳重警戒"; 
+                    box.className = "status-box status-severe"; 
+                } else if (wbgt >= 25) { 
+                    box.innerText = "警戒"; 
+                    box.className = "status-box status-warning"; 
+                } else if (wbgt >= 21) { 
+                    box.innerText = "注意"; 
+                    box.className = "status-box status-caution"; 
+                } else { 
+                    box.innerText = "ほぼ安全"; 
+                    box.className = "status-box status-safe"; 
+                }
 
             } catch (e) {
                 console.error(e);
-                document.getElementById('status-box').innerText = "更新待機中";
+                document.getElementById('status-box').innerText = "データ更新中";
             }
         }
 
