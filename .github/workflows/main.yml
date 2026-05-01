@@ -2,8 +2,8 @@ name: Update Weather Data
 
 on:
   schedule:
-    - cron: '*/10 * * * *' # 10分に1回実行（頻度を上げるとサイネージがリアルタイムに近くなります）
-  workflow_dispatch: # 手動実行用
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -26,13 +26,11 @@ jobs:
 
       - name: Run script
         run: python get_weather.py
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Commit and push if changed
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add weather_data.json
-          git commit -m "Update weather data" || exit 0
+          git commit -m "Update weather, noise, and vib data" || exit 0
           git push
