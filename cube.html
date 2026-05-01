@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        /* 128pxの5面サイネージ専用設計 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: "Arial Black", sans-serif;
+            width: 640px;
+            height: 128px;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .panel {
+            width: 128px;
+            height: 128px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-right: 1px solid #333;
+            position: relative;
+        }
+
+        /* 項目名（上部） */
+        .label {
+            font-size: 14px;
+            color: #aaa;
+            position: absolute;
+            top: 15px;
+        }
+
+        /* 数値（中央） */
+        .value {
+            font-size: 32px;
+            font-weight: 900;
+            margin-top: 10px;
+        }
+
+        /* 単位（数値の右下） */
+        .unit { font-size: 14px; margin-left: 2px; }
+
+        /* 焼き付き防止アニメーション */
+        .container {
+            display: flex;
+            width: 640px;
+            height: 128px;
+            animation: move 60s infinite linear;
+        }
+        @keyframes move {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(1px, 1px); }
+        }
+
+        /* 危険度別の色 */
+        .bg-blue { background-color: #007BFF; }
+        .bg-red { background-color: #FF0000; }
+        .bg-orange { background-color: #FF8C00; }
+        .bg-yellow { background-color: #FFD700; color: #000; }
+        .bg-green { background-color: #ADFF2F; color: #000; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 1面目: 日付 -->
+        <div class="panel">
+            <div class="label">DATE</div>
+            <div class="value" id="d-val">--/--</div>
+        </div>
+
+        <!-- 2面目: WBGT (色が変わる) -->
+        <div class="panel" id="wbgt-panel">
+            <div class="label">WBGT</div>
+            <div class="value" id="w-val">--.-<span class="unit">℃</span></div>
+        </div>
+
+        <!-- 3面目: 気温 -->
+        <div class="panel">
+            <div class="label">TEMP</div>
+            <div class="value" id="t-val">--<span class="unit">℃</span></div>
+        </div>
+
+        <!-- 4面目: 騒音 -->
+        <div class="panel">
+            <div class="label">NOISE</div>
+            <div class="value" id="n-val">--<span class="unit">dB</span></div>
+        </div>
+
+        <!-- 5面目: 振動 -->
+        <div class="panel" style="border:none;">
+            <div class="label">VIB</div>
+            <div class="value" id="v-val">--<span class="unit">dB</span></div>
+        </div>
+    </div>
+
+    <script>
+        async function update() {
+            try {
+                const res = await fetch('./weather_data.json?t=' + Date.now());
+                const data = await res.json();
+
+                // 日付
+                const now = new Date();
+                document.getElementById('d-val').innerText = (now.getMonth()+1) + '/' + now.getDate();
+
+                // 数値
+                const wbgt = parseFloat(data.wbgt);
+                document.getElementById('w-val').innerHTML = wbgt.toFixed(1) + '<span class="unit">℃</span>';
+                document.getElementById('t-val').innerHTML = data.temp + '<span class="unit">℃</span>';
+                document.getElementById('n-val').innerText = data.noise || "--";
+                document.getElementById('v-val').innerText = data.vib || "--";
+
+                // WBGTパネルの色変更
+                const wp = document.getElementById('wbgt-panel');
+                wp.className = "panel"; // 一旦リセット
+                if (wbgt >= 31) wp.classList.add("bg-red");
+                else if (wbgt >= 28) wp.classList.add("bg-orange");
+                else if (wbgt >= 25) wp.classList.add("bg-yellow");
+                else if (wbgt >= 21) wp.classList.add("bg-green");
+                else wp.classList.add("bg-blue");
+
+            } catch (e) { console.error(e); }
+        }
+        update();
+        setInterval(update, 600000);
+    </script>
+</body>
+</html>
