@@ -13,118 +13,78 @@
             overflow: hidden;
             display: flex;
         }
-
-        /* 128x128のパネル */
+        .container { display: flex; width: 640px; height: 128px; animation: shift 60s infinite linear; }
         .panel {
-            width: 128px;
-            height: 128px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            border-right: 2px solid #222;
-            position: relative;
+            width: 128px; height: 128px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            border-right: 1px solid #333; position: relative;
         }
+        .label { font-size: 16px; color: #00FF00; position: absolute; top: 10px; font-weight: bold; }
+        .value { font-size: 44px; font-weight: 900; margin-top: 15px; }
+        .unit { font-size: 16px; color: #888; }
+        .sub-label { font-size: 12px; color: #666; position: absolute; top: 10px; }
+        .sub-value { font-size: 26px; margin-top: 12px; }
+        
+        #wbgt-panel.bg-red { background-color: #FF0000; }
+        #wbgt-panel.bg-orange { background-color: #FF8C00; }
+        #wbgt-panel.bg-yellow { background-color: #FFD700; color: #000; }
+        #wbgt-panel.bg-blue { background-color: #007BFF; }
 
-        /* 強調パネル（騒音・振動用） */
-        .highlight {
-            background-color: #000;
-        }
-
-        .label {
-            font-size: 18px;
-            color: #00FF00; /* 目立つネオングリーン */
-            position: absolute;
-            top: 8px;
-        }
-
-        /* 数値をパネルの横幅いっぱいに強調 */
-        .value {
-            font-size: 48px; 
-            font-weight: 900;
-            line-height: 1;
-            margin-top: 10px;
-        }
-
-        .unit { font-size: 18px; color: #888; margin-top: 2px; }
-
-        /* サブ情報 */
-        .sub-label { font-size: 14px; color: #666; position: absolute; top: 10px; }
-        .sub-value { font-size: 28px; margin-top: 10px; }
-
-        /* 焼き付き防止 */
-        .container { display: flex; animation: shift 60s infinite linear; }
-        @keyframes shift {
-            0%, 100% { transform: translate(0,0); }
-            50% { transform: translate(1px, 1px); }
-        }
+        @keyframes shift { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(1px, 1px); } }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- 1面: 騒音（最大強調） -->
-        <div class="panel highlight">
+        <!-- 騒音面 -->
+        <div class="panel">
             <div class="label">騒音</div>
             <div class="value" id="n-val">--</div>
             <div class="unit">dB</div>
         </div>
-
-        <!-- 2面: 振動（最大強調） -->
-        <div class="panel highlight">
+        <!-- 振動面 -->
+        <div class="panel">
             <div class="label" style="color: #FF00FF;">振動</div>
             <div class="value" id="v-val">--</div>
             <div class="unit">dB</div>
         </div>
-
-        <!-- 3面: WBGT -->
+        <!-- WBGT面 -->
         <div class="panel" id="wbgt-panel">
             <div class="sub-label">WBGT</div>
             <div class="sub-value" id="w-val">--.-℃</div>
         </div>
-
-        <!-- 4面: 気温 -->
+        <!-- 気温面 -->
         <div class="panel">
             <div class="sub-label">TEMP</div>
             <div class="sub-value" id="t-val">--℃</div>
         </div>
-
-        <!-- 5面: 日付 -->
+        <!-- 日付面 -->
         <div class="panel" style="border:none;">
             <div class="sub-label">DATE</div>
             <div class="sub-value" id="date">--/--</div>
         </div>
     </div>
-
     <script>
         async function update() {
             try {
                 const res = await fetch('./weather_data.json?t=' + Date.now());
                 const data = await res.json();
-
-                // 騒音・振動（メインの切り抜き部分）
                 document.getElementById('n-val').innerText = data.noise || "--";
                 document.getElementById('v-val').innerText = data.vib || "--";
-
-                // WBGT・気温
                 const wbgt = parseFloat(data.wbgt);
                 document.getElementById('w-val').innerText = wbgt.toFixed(1) + '℃';
                 document.getElementById('t-val').innerText = data.temp + '℃';
-
-                // 日付
                 const now = new Date();
                 document.getElementById('date').innerText = (now.getMonth()+1) + '/' + now.getDate();
-
-                // WBGT色変更
                 const wp = document.getElementById('wbgt-panel');
-                if (wbgt >= 31) wp.style.backgroundColor = "#FF0000";
-                else if (wbgt >= 28) wp.style.backgroundColor = "#FF8C00";
-                else if (wbgt >= 25) wp.style.backgroundColor = "#FFD700";
-                else wp.style.backgroundColor = "#000";
-
+                wp.className = "panel";
+                if (wbgt >= 31) wp.classList.add("bg-red");
+                else if (wbgt >= 28) wp.classList.add("bg-orange");
+                else if (wbgt >= 25) wp.classList.add("bg-yellow");
+                else if (wbgt < 21) wp.classList.add("bg-blue");
             } catch (e) { console.error(e); }
         }
         update();
-        setInterval(update, 300000); // 5分更新
+        setInterval(update, 60000);
     </script>
 </body>
 </html>
